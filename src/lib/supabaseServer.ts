@@ -1,19 +1,29 @@
-// src/lib/supabaseServer.ts
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-export const createClientServer = () => {
-  const cookieStore = cookies();
+export async function createClient() {
+  // En Next.js 15+, cookies() es una promesa, hay que esperarla
+  const cookieStore = await cookies()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // El método set fue llamado desde un Server Component.
+            // Esto puede ignorarse si tienes middleware refrescando sesiones.
+          }
         },
       },
     }
-  );
-};
+  )
+}
