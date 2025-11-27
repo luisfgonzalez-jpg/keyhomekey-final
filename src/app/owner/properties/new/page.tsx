@@ -1,386 +1,323 @@
+// src/app/owner/properties/new/page.tsx
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { colombiaLocations } from '@/lib/colombiaData';
 
-type FormState = {
-  address: string;
-  type: string;
-  department: string;
-  municipality: string;
-  isRented: boolean;
-  tenantName: string;
-  tenantEmail: string;
-  tenantPhone: string;
-  ownerPhone: string;
-  contractStartDate: string;
-  contractEndDate: string;
+type DepartmentOption = {
+  departamento: string;
+  ciudades: string[];
 };
 
 export default function NewPropertyPage() {
-  const [form, setForm] = useState<FormState>({
-    address: '',
-    type: '',
-    department: '',
-    municipality: '',
-    isRented: false,
-    tenantName: '',
-    tenantEmail: '',
-    tenantPhone: '',
-    ownerPhone: '',
-    contractStartDate: '',
-    contractEndDate: '',
-  });
-
+  const [address, setAddress] = useState('');
+  const [propertyType, setPropertyType] = useState('Apartamento');
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [department, setDepartment] = useState('Bogotá D.C.');
+  const [city, setCity] = useState('Bogotá D.C.');
+  const [isRented, setIsRented] = useState(false);
+  const [tenantName, setTenantName] = useState('');
+  const [tenantPhone, setTenantPhone] = useState('');
+  const [contractStart, setContractStart] = useState('');
+  const [contractEnd, setContractEnd] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const selectedDepartment = colombiaLocations.find(
-    (d) => d.departamento === form.department
-  );
+  const router = useRouter();
 
-  const municipalities = selectedDepartment?.ciudades ?? [];
+  const departments: DepartmentOption[] = colombiaLocations;
 
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) {
-    const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  }
+  // Actualizar ciudades cuando cambie el departamento
+  useEffect(() => {
+    const dep = departments.find((d) => d.departamento === department);
+    if (dep) {
+      // Si la ciudad actual no existe en ese depto, selecciona la primera
+      if (!dep.ciudades.includes(city)) {
+        setCity(dep.ciudades[0]);
+      }
+    }
+  }, [department, departments, city]);
 
-  function handleToggleRented(e: React.ChangeEvent<HTMLInputElement>) {
-    const checked = e.target.checked;
-    setForm((prev) => ({
-      ...prev,
-      isRented: checked,
-      // si deja de estar arrendado, limpiamos datos del inquilino
-      ...(checked
-        ? {}
-        : {
-            tenantName: '',
-            tenantEmail: '',
-            tenantPhone: '',
-            contractStartDate: '',
-            contractEndDate: '',
-          }),
-    }));
-  }
-
-  async function handleSubmit(e: FormEvent) {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setLoading(true);
 
+    setLoading(true);
     try {
-      const { error } = await supabase.from('properties').insert({
-        address: form.address,
-        type: form.type,
-        department: form.department,
-        municipality: form.municipality,
-        city: form.municipality, // por si estás usando city como campo adicional
-        is_rented: form.isRented,
-        tenant_name: form.tenantName || null,
-        tenant_email: form.tenantEmail || null,
-        tenant_phone: form.tenantPhone || null,
-        owner_phone: form.ownerPhone || null,
-        contract_start_date: form.contractStartDate || null,
-        contract_end_date: form.contractEndDate || null,
-      });
+      // 1. Obtener usuario actual
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        console.error('Supabase getUser error:', userError);
+        alert('No pudimos obtener tu sesión. Intenta de nuevo.');
+        setLoading(false);
+        return;
+      }
+
+      if (!user) {
+        alert('Debes iniciar sesión para registrar una propiedad.');
+        setLoading(false);
+        router.push('/login');
+        return;
+      }
+
+      // 2. Preparar payload de la propiedad
+      const payload = {
+        owner_id: user.id,
+        address: address.trim(),
+        property_type: propertyType,
+        owner_phone: ownerPhone.trim(),
+        department,
+        city,
+        is_rented: isRented,
+        tenant_name: isRented ? tenantName.trim() : null,
+        tenant_phone: isRented ? tenantPhone.trim() : null,
+        contract_start: isRented && contractStart ? contractStart : null,
+        contract_end: isRented && contractEnd ? contractEnd : null,
+      };
+
+      // 3. Insert en Supabase
+      const { error } = await supabase.from('properties').insert([payload]);
 
       if (error) {
         console.error('Supabase insert error:', error);
         alert('Error al guardar la propiedad. Revisa la consola para más detalles.');
+        setLoading(false);
         return;
       }
 
       alert('Propiedad guardada correctamente ✅');
-
-      // limpiamos el formulario
-      setForm({
-        address: '',
-        type: '',
-        department: '',
-        municipality: '',
-        isRented: false,
-        tenantName: '',
-        tenantEmail: '',
-        tenantPhone: '',
-        ownerPhone: '',
-        contractStartDate: '',
-        contractEndDate: '',
-      });
-
-      // aquí más adelante podemos redirigir a /owner/properties
-      // router.push('/owner/properties');
-
+      router.push('/owner/properties');
     } catch (err) {
-      console.error(err);
+      console.error('Unexpected error saving property:', err);
       alert('Ocurrió un error inesperado al guardar la propiedad.');
     } finally {
       setLoading(false);
     }
-  }
+  };
+
+  const selectedDepartment = departments.find(
+    (d) => d.departamento === department
+  );
+
+  const citiesForDepartment = selectedDepartment?.ciudades ?? [];
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-4xl px-4 py-10">
-        <header className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-            Propietario
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold text-slate-900">
-            Registrar nueva propiedad
-          </h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Ingresa la dirección, tipo, ubicación y, si ya está arrendada, los datos
-            del inquilino y fechas de contrato.
-          </p>
-        </header>
+    <main className="space-y-6">
+      <header>
+        <h1 className="text-xl font-semibold text-slate-900">
+          Registrar nueva propiedad
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Ingresa la dirección, tipo, ubicación y, si ya está arrendada, los datos del inquilino y fechas de contrato.
+        </p>
+      </header>
 
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-100"
-        >
-          {/* Datos básicos */}
-          <section className="space-y-4">
-            <h2 className="text-sm font-semibold text-slate-800">
-              Datos del inmueble
-            </h2>
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+      >
+        {/* Datos del inmueble */}
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold tracking-[0.18em] text-slate-400 uppercase">
+            Datos del inmueble
+          </h2>
 
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-slate-700">
+              Dirección
+            </label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              required
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+              placeholder="Calle 103 # 15-55"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">
+                Tipo de inmueble
+              </label>
+              <select
+                value={propertyType}
+                onChange={(e) => setPropertyType(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+              >
+                <option>Apartamento</option>
+                <option>Casa</option>
+                <option>Oficina</option>
+                <option>Local</option>
+                <option>Bodega</option>
+                <option>Otro</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">
+                Teléfono del propietario (WhatsApp)
+              </label>
+              <input
+                type="tel"
+                value={ownerPhone}
+                onChange={(e) => setOwnerPhone(e.target.value)}
+                required
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                placeholder="3100000000"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Ubicación */}
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold tracking-[0.18em] text-slate-400 uppercase">
+            Ubicación
+          </h2>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">
+                Departamento
+              </label>
+              <select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+              >
+                {departments.map((d) => (
+                  <option key={d.departamento} value={d.departamento}>
+                    {d.departamento}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">
+                Municipio
+              </label>
+              <select
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+              >
+                {citiesForDepartment.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </section>
+
+        {/* Arrendamiento */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold tracking-[0.18em] text-slate-400 uppercase">
+                ¿El inmueble está arrendado?
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Si está arrendado, podremos generar alertas de contrato para ti y para tu inquilino.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs">
+              <span className={!isRented ? 'font-semibold text-slate-900' : 'text-slate-500'}>
+                No
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsRented(!isRented)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+                  isRented ? 'bg-slate-900' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                    isRented ? 'translate-x-5' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className={isRented ? 'font-semibold text-slate-900' : 'text-slate-500'}>
+                Sí
+              </span>
+            </div>
+          </div>
+
+          {isRented && (
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Dirección
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Nombre del inquilino
                 </label>
                 <input
                   type="text"
-                  name="address"
-                  value={form.address}
-                  onChange={handleChange}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/5 bg-white"
-                  placeholder="Ej. Calle 103 # 15-55, apto 402"
-                  required
+                  value={tenantName}
+                  onChange={(e) => setTenantName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Tipo de inmueble
-                </label>
-                <select
-                  name="type"
-                  value={form.type}
-                  onChange={handleChange}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/5 bg-white"
-                  required
-                >
-                  <option value="">Selecciona una opción</option>
-                  <option value="Apartamento">Apartamento</option>
-                  <option value="Casa">Casa</option>
-                  <option value="Oficina">Oficina</option>
-                  <option value="Local">Local</option>
-                  <option value="Bodega">Bodega</option>
-                  <option value="Otro">Otro</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Teléfono del propietario (WhatsApp)
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Teléfono del inquilino
                 </label>
                 <input
                   type="tel"
-                  name="ownerPhone"
-                  value={form.ownerPhone}
-                  onChange={handleChange}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/5 bg-white"
-                  placeholder="Ej. +57 300 123 4567"
+                  value={tenantPhone}
+                  onChange={(e) => setTenantPhone(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Fecha de inicio del contrato
+                </label>
+                <input
+                  type="date"
+                  value={contractStart}
+                  onChange={(e) => setContractStart(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Fecha de finalización del contrato
+                </label>
+                <input
+                  type="date"
+                  value={contractEnd}
+                  onChange={(e) => setContractEnd(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
                 />
               </div>
             </div>
-          </section>
+          )}
+        </section>
 
-          {/* Ubicación */}
-          <section className="space-y-4">
-            <h2 className="text-sm font-semibold text-slate-800">Ubicación</h2>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Departamento
-                </label>
-                <select
-                  name="department"
-                  value={form.department}
-                  onChange={(e) => {
-                    setForm((prev) => ({
-                      ...prev,
-                      department: e.target.value,
-                      municipality: '',
-                    }));
-                  }}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/5 bg-white"
-                  required
-                >
-                  <option value="">Selecciona un departamento</option>
-                  {colombiaLocations.map((d) => (
-                    <option key={d.departamento} value={d.departamento}>
-                      {d.departamento}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Municipio
-                </label>
-                <select
-                  name="municipality"
-                  value={form.municipality}
-                  onChange={handleChange}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/5 bg-white"
-                  required
-                  disabled={!form.department}
-                >
-                  <option value="">
-                    {form.department
-                      ? 'Selecciona un municipio'
-                      : 'Primero elige un departamento'}
-                  </option>
-                  {municipalities.map((m: string) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </section>
-
-          {/* Estado de arriendo */}
-          <section className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-800">
-                  ¿El inmueble está arrendado?
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Si está arrendado, podremos generar alertas de contrato para ti
-                  y para tu inquilino.
-                </p>
-              </div>
-
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <span>No</span>
-                <div className="relative inline-flex h-5 w-9 items-center rounded-full bg-slate-300 transition">
-                  <input
-                    type="checkbox"
-                    className="peer absolute h-5 w-9 cursor-pointer opacity-0"
-                    checked={form.isRented}
-                    onChange={handleToggleRented}
-                  />
-                  <span className="pointer-events-none inline-block h-4 w-4 translate-x-0 rounded-full bg-white shadow transition peer-checked:translate-x-4 peer-checked:bg-slate-900" />
-                </div>
-                <span>Sí</span>
-              </label>
-            </div>
-
-            {form.isRented && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Nombre del inquilino
-                  </label>
-                  <input
-                    type="text"
-                    name="tenantName"
-                    value={form.tenantName}
-                    onChange={handleChange}
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/5 bg-white"
-                    placeholder="Nombre completo"
-                    required={form.isRented}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Correo del inquilino
-                  </label>
-                  <input
-                    type="email"
-                    name="tenantEmail"
-                    value={form.tenantEmail}
-                    onChange={handleChange}
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/5 bg-white"
-                    placeholder="Ej. inquilino@correo.com"
-                    required={form.isRented}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Teléfono del inquilino
-                  </label>
-                  <input
-                    type="tel"
-                    name="tenantPhone"
-                    value={form.tenantPhone}
-                    onChange={handleChange}
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/5 bg-white"
-                    placeholder="Ej. +57 300 000 0000"
-                    required={form.isRented}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Inicio del contrato
-                    </label>
-                    <input
-                      type="date"
-                      name="contractStartDate"
-                      value={form.contractStartDate}
-                      onChange={handleChange}
-                      className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/5 bg-white"
-                      required={form.isRented}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Fin del contrato
-                    </label>
-                    <input
-                      type="date"
-                      name="contractEndDate"
-                      value={form.contractEndDate}
-                      onChange={handleChange}
-                      className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/5 bg-white"
-                      required={form.isRented}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* Botón guardar */}
-          <div className="flex justify-end border-t border-slate-100 pt-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="inline-flex items-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-            >
-              {loading ? 'Guardando…' : 'Guardar propiedad'}
-            </button>
-          </div>
-        </form>
-      </div>
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-full bg-slate-900 px-6 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            {loading ? 'Guardando…' : 'Guardar propiedad'}
+          </button>
+        </div>
+      </form>
     </main>
   );
 }
+
 
