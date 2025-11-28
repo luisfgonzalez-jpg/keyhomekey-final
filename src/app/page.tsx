@@ -1,456 +1,1184 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient'; 
-// 👇 Importamos la lista de Colombia que acabas de crear
-import { colombiaLocations } from '@/lib/colombiaData'; 
+import type { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabaseClient';
+import { colombiaLocations } from '@/lib/colombiaData';
 
-import { 
-  Home, User, Wrench, MapPin, Plus, CheckCircle, 
-  AlertTriangle, Truck, UserCheck, LogOut, 
-  MessageCircle, Calendar, Mail, Lock, Phone, Send, FileText
+import {
+  Home,
+  User,
+  Wrench,
+  MapPin,
+  Plus,
+  CheckCircle,
+  AlertTriangle,
+  Truck,
+  UserCheck,
+  LogOut,
+  MessageCircle,
+  Calendar,
+  Mail,
+  Lock,
+  Phone,
+  Send,
+  FileText,
 } from 'lucide-react';
 
-const KEYHOME_WHATSAPP = "573001234567"; 
+const KEYHOME_WHATSAPP = '573001234567'; // número general de Keyhomekey
 
-// --- COMPONENTES UI ---
-const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false, type = 'button' }: any) => {
-  const baseStyle = "px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md";
-  const variants: any = {
-    primary: "bg-gradient-to-r from-indigo-600 to-blue-600 text-white hover:from-indigo-700 hover:to-blue-700",
-    secondary: "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50",
-    danger: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-100",
-    success: "bg-emerald-600 text-white hover:bg-emerald-700",
-    purple: "bg-purple-600 text-white hover:bg-purple-700"
+// -----------------------------------------------------------------------------
+// UI BÁSICA
+// -----------------------------------------------------------------------------
+
+const Button = ({
+  children,
+  onClick,
+  type = 'button',
+  variant = 'primary',
+  disabled = false,
+  className = '',
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  type?: 'button' | 'submit';
+  variant?: 'primary' | 'outline' | 'ghost' | 'danger';
+  disabled?: boolean;
+  className?: string;
+}) => {
+  const base =
+    'inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-offset-2';
+
+  const variants: Record<string, string> = {
+    primary: 'bg-slate-900 text-white hover:bg-slate-800 focus:ring-slate-900',
+    outline:
+      'border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 focus:ring-slate-300',
+    ghost:
+      'text-slate-600 hover:bg-slate-100 focus:ring-slate-200 border border-transparent',
+    danger:
+      'bg-red-600 text-white hover:bg-red-500 focus:ring-red-600 border border-transparent',
   };
-  return <button type={type} onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${className}`}>{children}</button>;
+
+  const disabledStyle = disabled
+    ? 'opacity-60 cursor-not-allowed'
+    : 'cursor-pointer';
+
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`${base} ${variants[variant]} ${disabledStyle} ${className}`}
+    >
+      {children}
+    </button>
+  );
 };
 
-const Card = ({ children, className = '' }: any) => (
-  <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${className}`}>{children}</div>
+const Card = ({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <div
+    className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${className}`}
+  >
+    {children}
+  </div>
 );
 
 const Input = ({ icon: Icon, ...props }: any) => (
   <div className="relative">
-    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><Icon size={20} /></div>
-    <input {...props} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-slate-50 focus:bg-white"/>
+    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+      <Icon size={20} />
+    </div>
+    <input
+      {...props}
+      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none transition-all"
+    />
+  </div>
+);
+
+const TextArea = ({ icon: Icon, ...props }: any) => (
+  <div className="relative">
+    <div className="absolute left-3 top-4 text-slate-400">
+      <Icon size={20} />
+    </div>
+    <textarea
+      {...props}
+      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none transition-all min-h-[90px] resize-vertical"
+    />
   </div>
 );
 
 const StatusBadge = ({ status }: { status: string }) => {
-  const config: any = {
-    'Pendiente': { color: 'bg-amber-100 text-amber-800 border-amber-200' },
-    'Asignado': { color: 'bg-blue-100 text-blue-800 border-blue-200' },
-    'En Camino': { color: 'bg-purple-100 text-purple-800 border-purple-200' },
-    'En Sitio': { color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-    'Resuelto': { color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-  };
-  const style = config[status] || config['Pendiente'];
-  return <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit border ${style.color}`}>{status}</span>;
+  let color = 'bg-slate-100 text-slate-700';
+  if (status === 'Pendiente')
+    color = 'bg-amber-100 text-amber-800 border border-amber-200';
+  if (status === 'Asignado')
+    color = 'bg-blue-100 text-blue-800 border border-blue-200';
+  if (status === 'En Camino')
+    color = 'bg-indigo-100 text-indigo-800 border border-indigo-200';
+  if (status === 'Resuelto')
+    color = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+  if (status === 'Cancelado')
+    color = 'bg-red-100 text-red-800 border border-red-200';
+
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${color}`}
+    >
+      {status}
+    </span>
+  );
 };
 
-// --- APP PRINCIPAL ---
-export default function KeyhomeKeyApp() {
-  const [session, setSession] = useState<any>(null);
-  const [userRole, setUserRole] = useState<string | null>(null); 
-  const [view, setView] = useState('login'); 
-  const [loading, setLoading] = useState(false);
-  const [properties, setProperties] = useState<any[]>([]);
-  const [tickets, setTickets] = useState<any[]>([]);
+// -----------------------------------------------------------------------------
+// TIPOS
+// -----------------------------------------------------------------------------
 
-  // Auth
+type Role = 'OWNER' | 'TENANT' | null;
+
+interface Property {
+  id: string;
+  address: string;
+  department: string;
+  municipality: string;
+  type: string;
+  owner_phone: string;
+  is_rented: boolean;
+  tenant_name: string | null;
+  tenant_email: string | null;
+  tenant_phone: string | null;
+  contract_start_date: string | null;
+  contract_end_date: string | null;
+}
+
+interface Ticket {
+  id: string;
+  property_id: string;
+  category: string;
+  description: string;
+  priority: string;
+  provider_option: string | null;
+  reporter: string;
+  status: string;
+  created_at?: string;
+}
+
+// -----------------------------------------------------------------------------
+// PÁGINA PRINCIPAL
+// -----------------------------------------------------------------------------
+
+export default function HomePage() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [userRole, setUserRole] = useState<Role>(null);
+  const [view, setView] = useState<'login' | 'dashboard'>('login');
+  const [loading, setLoading] = useState(false);
+
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+
+  // AUTH
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  // Formulario Propiedad (NUEVOS CAMPOS)
-  const [newProp, setNewProp] = useState({ 
-    address: '', 
-    department: '',       // Nuevo
-    municipality: '',     // Nuevo
-    ownerPhone: '',       // Nuevo
-    type: 'Apartamento', 
-    isRented: false, 
-    tenantName: '', 
-    tenantEmail: '', 
-    tenantPhone: '',      // Nuevo
-    contractStart: '', 
-    contractEnd: '' 
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+
+  // FORM PROPIEDAD
+  const [newProp, setNewProp] = useState({
+    address: '',
+    type: 'Apartamento',
+    department: '',
+    municipality: '',
+    ownerPhone: '',
+    isRented: false,
+    tenantName: '',
+    tenantEmail: '',
+    tenantPhone: '',
+    contractStart: '',
+    contractEnd: '',
   });
-  
-  // Estado para guardar las ciudades del departamento seleccionado
+
   const [availableCities, setAvailableCities] = useState<string[]>([]);
 
-  const [newTicket, setNewTicket] = useState({ propertyId: '', category: 'Plomería', description: '', priority: 'Media', providerOption: 'KeyhomeKey' });
+  // FORM TICKET
+  const [newTicket, setNewTicket] = useState({
+    propertyId: '',
+    category: 'Plomería',
+    description: '',
+    priority: 'Media',
+    providerOption: 'KeyhomeKey',
+  });
 
-  // Inicialización
+  // ---------------------------------------------------------------------------
+  // INICIALIZACIÓN
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) {
-        await detectRoleAndRedirect(session.user.email, session.user.id);
+        setSession(session);
+        await detectRoleAndLoad(session.user);
       }
     };
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (!session) setView('login');
+      if (!session) {
+        setUserRole(null);
+        setView('login');
+      }
     });
-    return () => subscription.unsubscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // --- Lógica Inteligente de Ubicación ---
-  useEffect(() => {
-    if (newProp.department) {
-      // Buscamos las ciudades del departamento seleccionado en tu archivo colombiaData
-      const deptData = colombiaLocations.find(d => d.departamento === newProp.department);
-      
-      if (deptData) {
-        setAvailableCities(deptData.ciudades);
-        
-        // Si es Bogotá, autoseleccionar el municipio
-        if (newProp.department === 'Bogotá D.C.') {
-          setNewProp(prev => ({ ...prev, municipality: 'Bogotá D.C.' }));
+  // ---------------------------------------------------------------------------
+  // FUNCIONES DE NEGOCIO
+  // ---------------------------------------------------------------------------
+
+  const detectRoleAndLoad = async (user: User) => {
+    try {
+      // 1) Intentar leer el perfil, si existe
+      const { data: profile } = await supabase
+        .from('users_profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      let role: Role = null;
+
+      if (profile?.role === 'TENANT' || profile?.role === 'OWNER') {
+        role = profile.role;
+      } else {
+        // 2) Si no hay perfil todavía, detectar si es inquilino buscando properties.tenant_email
+        const { data: tenantProps, error: tenantErr } = await supabase
+          .from('properties')
+          .select('id')
+          .eq('tenant_email', user.email);
+
+        if (!tenantErr && tenantProps && tenantProps.length > 0) {
+          role = 'TENANT';
         } else {
-          setNewProp(prev => ({ ...prev, municipality: '' })); // Resetear si cambia
+          role = 'OWNER';
         }
       }
-    } else {
-      setAvailableCities([]);
-    }
-  }, [newProp.department]);
 
-
-  // --- Lógica de Roles ---
-  const detectRoleAndRedirect = async (email: string | undefined, userId: string) => {
-    if (!email) return;
-    setLoading(true);
-
-    const { data: tenantProp } = await supabase.from('properties').select('id').eq('tenant_email', email).maybeSingle();
-
-    if (tenantProp) {
-      setUserRole('tenant');
-      setView('tenant-home');
-      fetchData('tenant', email, userId);
-    } else {
-      setUserRole('owner');
-      setView('owner-home');
-      fetchData('owner', email, userId);
+      setUserRole(role);
+      setView('dashboard');
+      await fetchData(role, user);
+    } catch (error) {
+      console.error('Error detectRoleAndLoad:', error);
     }
   };
 
-  const fetchData = async (role: string, userEmail: string, userId: string) => {
-    setLoading(true);
-    let propsQuery = supabase.from('properties').select('*').order('created_at', { ascending: false });
-    let ticketsQuery = supabase.from('tickets').select('*').order('created_at', { ascending: false });
+  const fetchData = async (role: Role, user: User) => {
+    if (!role) return;
+    try {
+      if (role === 'OWNER') {
+        const { data: propsData } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('owner_id', user.id)
+          .order('created_at', { ascending: false });
 
-    if (role === 'owner') propsQuery = propsQuery.eq('owner_id', userId); 
-    else if (role === 'tenant') propsQuery = propsQuery.eq('tenant_email', userEmail);
+        setProperties((propsData || []) as Property[]);
+      } else if (role === 'TENANT') {
+        const { data: propsData } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('tenant_email', user.email)
+          .order('created_at', { ascending: false });
 
-    const { data: propsData } = await propsQuery;
-    if (propsData) setProperties(propsData || []);
+        setProperties((propsData || []) as Property[]);
+      }
 
-    const { data: ticketsData } = await ticketsQuery;
-    if (ticketsData) setTickets(ticketsData || []);
-    setLoading(false);
+      const { data: ticketsData } = await supabase
+        .from('tickets')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const allTickets = (ticketsData || []) as Ticket[];
+
+      if (role === 'OWNER') {
+        const propIds = new Set(properties.map((p) => p.id));
+        setTickets(allTickets.filter((t) => propIds.has(t.property_id)));
+      } else if (role === 'TENANT') {
+        const propIds = new Set(properties.map((p) => p.id));
+        setTickets(
+          allTickets.filter(
+            (t) => propIds.has(t.property_id) || t.reporter === 'Inquilino',
+          ),
+        );
+      }
+    } catch (error) {
+      console.error('Error fetchData:', error);
+    }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    if (authMode === 'signup') {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) alert(error.message);
-      else alert('Registro exitoso. ¡Inicia sesión!');
+
+    try {
+      if (authMode === 'signup') {
+        // 1. Crear usuario en Auth
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        const user = data.user;
+        if (!user) throw new Error('No se pudo obtener el usuario.');
+
+        // 2. Crear perfil OWNER en users_profiles
+        const { error: profileError } = await supabase
+          .from('users_profiles')
+          .insert([
+            {
+              user_id: user.id,
+              name: name.trim(),
+              email: email.trim(),
+              phone: phone.trim(),
+              role: 'OWNER',
+            },
+          ]);
+
+        if (profileError) {
+          console.error(profileError);
+          alert(
+            'La cuenta se creó, pero hubo un problema guardando el perfil.',
+          );
+        } else {
+          alert('Registro exitoso. Ahora inicia sesión.');
+        }
+
+        // volvemos al modo login
+        setAuthMode('signin');
+      } else {
+        // LOGIN
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        if (data.session) {
+          setSession(data.session);
+          await detectRoleAndLoad(data.session.user);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error de autenticación.');
+    } finally {
       setLoading(false);
-    } else {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) { alert(error.message); setLoading(false); }
-      else if (data.session) detectRoleAndRedirect(data.session.user.email, data.session.user.id);
     }
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setView('login');
+    setSession(null);
     setUserRole(null);
+    setView('login');
+    setEmail('');
+    setPassword('');
+  };
+
+  const handleDepartmentChange = (dept: string) => {
+    setNewProp((prev) => ({ ...prev, department: dept, municipality: '' }));
+    const found = colombiaLocations.find((d) => d.department === dept);
+    setAvailableCities(found ? found.cities : []);
   };
 
   const addProperty = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    
-    const { error } = await supabase.from('properties').insert([{
-      owner_id: session?.user?.id, 
-      address: newProp.address,
-      department: newProp.department, // Nuevo
-      municipality: newProp.municipality, // Nuevo
-      owner_phone: newProp.ownerPhone, // Nuevo
-      type: newProp.type,
-      is_rented: newProp.isRented,
-      tenant_name: newProp.isRented ? newProp.tenantName : null,
-      tenant_email: newProp.isRented ? newProp.tenantEmail : null,
-      tenant_phone: newProp.isRented ? newProp.tenantPhone : null, // Nuevo
-      contract_start_date: newProp.isRented ? newProp.contractStart : null,
-      contract_end_date: newProp.isRented ? newProp.contractEnd : null
-    }]);
+    if (!session?.user) return;
 
-    if (error) alert("Error al guardar: " + error.message);
-    else {
+    try {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('properties')
+        .insert([
+          {
+            owner_id: session.user.id,
+            address: newProp.address,
+            type: newProp.type,
+            department: newProp.department,
+            municipality: newProp.municipality,
+            owner_phone: newProp.ownerPhone,
+            is_rented: newProp.isRented,
+            tenant_name: newProp.isRented ? newProp.tenantName : null,
+            tenant_email: newProp.isRented ? newProp.tenantEmail : null,
+            tenant_phone: newProp.isRented ? newProp.tenantPhone : null,
+            contract_start_date: newProp.contractStart || null,
+            contract_end_date: newProp.contractEnd || null,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // actualizar lista en pantalla
+      setProperties((prev) => [data as Property, ...prev]);
+
+      // si hay inquilino, enviar invitación por email
       if (newProp.isRented && newProp.tenantEmail) {
         try {
           await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: newProp.tenantEmail, name: newProp.tenantName, type: 'invitation' })
+            body: JSON.stringify({
+              email: newProp.tenantEmail,
+              propertyAddress: newProp.address,
+            }),
           });
-          alert("✅ Guardado y correo enviado.");
-        } catch (err: any) {
-          alert(`⚠️ Guardado, error correo: ${err.message}`);
+        } catch (err) {
+          console.error('Error enviando email de invitación:', err);
         }
-      } else {
-        alert("✅ Propiedad guardada exitosamente.");
       }
-      // Limpiar formulario
-      setNewProp({ 
-        address: '', department: '', municipality: '', ownerPhone: '', 
-        type: 'Apartamento', isRented: false, tenantName: '', 
-        tenantEmail: '', tenantPhone: '', contractStart: '', contractEnd: '' 
+
+      // resetear formulario
+      setNewProp({
+        address: '',
+        type: 'Apartamento',
+        department: '',
+        municipality: '',
+        ownerPhone: '',
+        isRented: false,
+        tenantName: '',
+        tenantEmail: '',
+        tenantPhone: '',
+        contractStart: '',
+        contractEnd: '',
       });
-      setView('owner-home');
-      fetchData('owner', session.user.email, session.user.id); 
+      setAvailableCities([]);
+
+      alert('Inmueble guardado correctamente.');
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error guardando el inmueble.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const createTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.from('tickets').insert([{
-      property_id: Number(newTicket.propertyId),
-      category: newTicket.category,
-      description: newTicket.description,
-      priority: newTicket.priority,
-      provider_option: newTicket.providerOption,
-      reporter: userRole === 'owner' ? 'Propietario' : 'Inquilino',
-      status: 'Pendiente'
-    }]);
-
-    if (error) alert("Error: " + error.message);
-    else {
-      // Lógica de Proveedor (WhatsApp) - Aquí usamos la ubicación guardada
-      const prop = properties.find(p => p.id == newTicket.propertyId);
-      
-      // Mensaje inteligente con ubicación
-      const text = `Hola, NUEVO SERVICIO REQUERIDO:\n🏠 *Ubicación:* ${prop?.address}, ${prop?.municipality} (${prop?.department})\n🔧 *Servicio:* ${newTicket.category}\n📝 *Detalle:* ${newTicket.description}\n🚨 *Prioridad:* ${newTicket.priority}`;
-      
-      window.open(`https://wa.me/${KEYHOME_WHATSAPP}?text=${encodeURIComponent(text)}`, '_blank');
-      
-      alert("Ticket creado y proveedor notificado.");
-      setView(userRole === 'owner' ? 'owner-home' : 'tenant-home');
-      fetchData(userRole!, session.user.email, session.user.id);
+    if (!session?.user) return;
+    if (!newTicket.propertyId) {
+      alert('Selecciona un inmueble.');
+      return;
     }
-    setLoading(false);
+
+    try {
+      setLoading(true);
+
+      const property = properties.find((p) => p.id === newTicket.propertyId);
+
+      const { data, error } = await supabase
+        .from('tickets')
+        .insert([
+          {
+            property_id: newTicket.propertyId,
+            category: newTicket.category,
+            description: newTicket.description,
+            priority: newTicket.priority,
+            provider_option: newTicket.providerOption,
+            reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
+            status: 'Pendiente',
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTickets((prev) => [data as Ticket, ...prev]);
+
+      // Abrir WhatsApp para contactar a KeyhomeKey (o luego al proveedor)
+      if (property && typeof window !== 'undefined') {
+        const text = encodeURIComponent(
+          `Nuevo ticket de ${
+            userRole === 'OWNER' ? 'propietario' : 'inquilino'
+          }.\n\nInmueble: ${property.address} - ${property.municipality}, ${
+            property.department
+          }\nCategoría: ${newTicket.category}\nPrioridad: ${
+            newTicket.priority
+          }\nDescripción: ${newTicket.description}`,
+        );
+        window.open(`https://wa.me/${KEYHOME_WHATSAPP}?text=${text}`, '_blank');
+      }
+
+      setNewTicket({
+        propertyId: '',
+        category: 'Plomería',
+        description: '',
+        priority: 'Media',
+        providerOption: 'KeyhomeKey',
+      });
+
+      alert('Ticket creado correctamente.');
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error creando el ticket.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // --- VISTAS ---
+  // ---------------------------------------------------------------------------
+  // VISTAS
+  // ---------------------------------------------------------------------------
 
   if (view === 'login') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50 flex flex-col items-center justify-center p-6 font-sans">
-        <div className="w-full max-w-md text-center">
-          <div className="bg-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl"><Home className="text-white" size={32}/></div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-8">KeyhomeKey</h1>
-          <Card className="p-8">
-            <div className="flex gap-2 mb-6 bg-slate-100 p-1 rounded-xl">
-              <button onClick={() => setAuthMode('signin')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${authMode === 'signin' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}>Ingresar</button>
-              <button onClick={() => setAuthMode('signup')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${authMode === 'signup' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`}>Registro</button>
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center px-4">
+        <Card className="max-w-md w-full p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-10 w-10 rounded-2xl bg-slate-900 flex items-center justify-center">
+              <Home size={22} className="text-white" />
             </div>
-            <form onSubmit={handleAuth} className="space-y-4">
-              <Input icon={Mail} type="email" placeholder="Email" required value={email} onChange={(e:any) => setEmail(e.target.value)} />
-              <Input icon={Lock} type="password" placeholder="Contraseña" required value={password} onChange={(e:any) => setPassword(e.target.value)} />
-              <Button disabled={loading} type="submit" className="w-full mt-4">{loading ? '...' : (authMode === 'signin' ? 'Entrar' : 'Crear Cuenta')}</Button>
-            </form>
-          </Card>
-        </div>
+            <div>
+              <h1 className="text-xl font-semibold text-slate-900">
+                KeyhomeKey
+              </h1>
+              <p className="text-xs text-slate-500">
+                Propietarios, inquilinos y proveedores en un solo lugar.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2 mb-6">
+            <Button
+              variant={authMode === 'signin' ? 'primary' : 'ghost'}
+              className="flex-1"
+              onClick={() => setAuthMode('signin')}
+            >
+              Iniciar sesión
+            </Button>
+            <Button
+              variant={authMode === 'signup' ? 'primary' : 'ghost'}
+              className="flex-1"
+              onClick={() => setAuthMode('signup')}
+            >
+              Crear cuenta
+            </Button>
+          </div>
+
+          <form onSubmit={handleAuth} className="space-y-4">
+            {authMode === 'signup' && (
+              <>
+                <Input
+                  icon={User}
+                  type="text"
+                  placeholder="Nombre completo"
+                  required
+                  value={name}
+                  onChange={(e: any) => setName(e.target.value)}
+                />
+                <Input
+                  icon={Phone}
+                  type="tel"
+                  placeholder="Teléfono (WhatsApp)"
+                  required
+                  value={phone}
+                  onChange={(e: any) => setPhone(e.target.value)}
+                />
+              </>
+            )}
+
+            <Input
+              icon={Mail}
+              type="email"
+              placeholder="Email"
+              required
+              value={email}
+              onChange={(e: any) => setEmail(e.target.value)}
+            />
+            <Input
+              icon={Lock}
+              type="password"
+              placeholder="Contraseña"
+              required
+              value={password}
+              onChange={(e: any) => setPassword(e.target.value)}
+            />
+
+            <Button disabled={loading} type="submit" className="w-full mt-2">
+              {loading
+                ? 'Procesando...'
+                : authMode === 'signin'
+                ? 'Entrar'
+                : 'Crear cuenta'}
+            </Button>
+          </form>
+
+          <p className="mt-6 text-[11px] text-slate-400 text-center">
+            Al continuar aceptas recibir comunicaciones por correo y WhatsApp
+            relacionadas con la gestión de tus inmuebles.
+          </p>
+        </Card>
       </div>
     );
   }
 
-  if (view === 'add-property') {
-    return (
-      <div className="min-h-screen bg-slate-50 p-4 font-sans">
-        <div className="max-w-lg mx-auto">
-          <Button onClick={() => setView('owner-home')} variant="secondary" className="mb-6">← Volver</Button>
-          <Card className="p-6">
-            <h2 className="text-2xl font-bold mb-6">Nueva Propiedad</h2>
-            <form onSubmit={addProperty} className="space-y-4">
-              
-              {/* DATOS DE UBICACIÓN */}
-              <Input icon={MapPin} required placeholder="Dirección exacta" value={newProp.address} onChange={(e:any) => setNewProp({...newProp, address: e.target.value})} />
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 ml-1">Departamento</label>
-                  <select required className="w-full p-3 border rounded-xl bg-white mt-1" value={newProp.department} onChange={(e:any) => setNewProp({...newProp, department: e.target.value})}>
-                    <option value="">Seleccione...</option>
-                    {colombiaLocations.map(d => <option key={d.departamento} value={d.departamento}>{d.departamento}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 ml-1">Municipio</label>
-                  <select required className="w-full p-3 border rounded-xl bg-white mt-1" disabled={!newProp.department} value={newProp.municipality} onChange={(e:any) => setNewProp({...newProp, municipality: e.target.value})}>
-                    <option value="">Seleccione...</option>
-                    {availableCities.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
+  // DASHBOARD (propietario o inquilino)
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans">
+      <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-slate-900 flex items-center justify-center">
+              <Home size={20} className="text-white" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] text-slate-400">
+                Panel {userRole === 'OWNER' ? 'propietario' : 'inquilino'}
+              </p>
+              <h2 className="text-sm font-semibold text-slate-900">
+                KeyhomeKey
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <StatusBadge
+              status={userRole === 'OWNER' ? 'Propietario' : 'Inquilino'}
+            />
+            <Button
+              variant="ghost"
+              className="text-xs gap-2"
+              onClick={handleLogout}
+            >
+              <LogOut size={16} />
+              Salir
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+        {/* BLOQUE DE PROPIEDADES */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <MapPin size={16} />
+                Mis inmuebles
+              </h3>
+              {userRole === 'OWNER' && (
+                <Button
+                  variant="outline"
+                  className="text-xs gap-2"
+                  onClick={() =>
+                    document
+                      ?.getElementById('add-property')
+                      ?.scrollIntoView({ behavior: 'smooth' })
+                  }
+                >
+                  <Plus size={14} />
+                  Agregar inmueble
+                </Button>
+              )}
+            </div>
+
+            {properties.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                Aún no hay inmuebles registrados.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {properties.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-start justify-between border border-slate-100 rounded-xl px-4 py-3 bg-slate-50"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {p.address}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {p.municipality}, {p.department} · {p.type}
+                      </p>
+                      {p.is_rented && p.tenant_name && (
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Inquilino: {p.tenant_name} ({p.tenant_email})
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-[11px] text-slate-500">
+                        Tel: {p.owner_phone}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                        <UserCheck size={12} />
+                        {p.is_rented ? 'Arrendado' : 'Disponible'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
+            )}
+          </Card>
 
-              <Input icon={Phone} required placeholder="Teléfono Propietario (WhatsApp)" value={newProp.ownerPhone} onChange={(e:any) => setNewProp({...newProp, ownerPhone: e.target.value})} />
-
-              <div className="relative">
-                <Home className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20}/>
-                <select className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50" value={newProp.type} onChange={(e:any) => setNewProp({...newProp, type: e.target.value})}>
-                  <option>Apartamento</option><option>Casa</option><option>Local</option>
-                </select>
+          {/* TUS ESTADÍSTICAS SENCILLAS */}
+          <Card className="p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <FileText size={16} />
+              Resumen
+            </h3>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
+                <p className="text-[11px] text-slate-500 mb-1">
+                  Inmuebles activos
+                </p>
+                <p className="text-lg font-semibold text-slate-900">
+                  {properties.length}
+                </p>
               </div>
+              <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
+                <p className="text-[11px] text-slate-500 mb-1">
+                  Tickets abiertos
+                </p>
+                <p className="text-lg font-semibold text-slate-900">
+                  {tickets.filter((t) => t.status !== 'Resuelto').length}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
 
-              {/* SECCIÓN ARRIENDO */}
-              <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                <label className="flex items-center gap-3 font-bold text-indigo-900 cursor-pointer mb-3">
-                  <input type="checkbox" className="w-5 h-5 accent-indigo-600" checked={newProp.isRented} onChange={(e:any) => setNewProp({...newProp, isRented: e.target.checked})} /> En Arriendo
+        {/* FORMULARIO NUEVO TICKET */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="p-5">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
+              <Wrench size={16} />
+              Reportar falla (ticket)
+            </h3>
+
+            <form onSubmit={createTicket} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[11px] text-slate-500 mb-1">
+                  Inmueble
                 </label>
-                {newProp.isRented && (
-                  <div className="space-y-3 pl-2 border-l-2 border-indigo-200 animate-in slide-in-from-top-2">
-                    <Input icon={User} required placeholder="Nombre Inquilino" value={newProp.tenantName} onChange={(e:any) => setNewProp({...newProp, tenantName: e.target.value})} />
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input icon={Mail} required type="email" placeholder="Email Inquilino" value={newProp.tenantEmail} onChange={(e:any) => setNewProp({...newProp, tenantEmail: e.target.value})} />
-                      <Input icon={Phone} required type="tel" placeholder="Tel Inquilino" value={newProp.tenantPhone} onChange={(e:any) => setNewProp({...newProp, tenantPhone: e.target.value})} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div><span className="text-xs text-indigo-600 font-bold">Inicio Contrato</span><input type="date" className="w-full p-2 rounded border" required value={newProp.contractStart} onChange={(e:any) => setNewProp({...newProp, contractStart: e.target.value})} /></div>
-                      <div><span className="text-xs text-indigo-600 font-bold">Fin Contrato</span><input type="date" className="w-full p-2 rounded border" required value={newProp.contractEnd} onChange={(e:any) => setNewProp({...newProp, contractEnd: e.target.value})} /></div>
-                    </div>
-                    <div className="bg-blue-50 text-blue-700 p-3 rounded-lg text-xs flex items-center gap-2"><Send size={14}/> Se enviará la invitación al inquilino.</div>
-                  </div>
+                <select
+                  required
+                  value={newTicket.propertyId}
+                  onChange={(e) =>
+                    setNewTicket((prev) => ({
+                      ...prev,
+                      propertyId: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
+                >
+                  <option value="">Selecciona un inmueble</option>
+                  {properties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.address} – {p.municipality}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">
+                    Categoría
+                  </label>
+                  <select
+                    value={newTicket.category}
+                    onChange={(e) =>
+                      setNewTicket((prev) => ({
+                        ...prev,
+                        category: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
+                  >
+                    <option>Plomería</option>
+                    <option>Eléctrico</option>
+                    <option>Electrodomésticos</option>
+                    <option>Cerrajería</option>
+                    <option>Otros</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">
+                    Prioridad
+                  </label>
+                  <select
+                    value={newTicket.priority}
+                    onChange={(e) =>
+                      setNewTicket((prev) => ({
+                        ...prev,
+                        priority: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
+                  >
+                    <option>Alta</option>
+                    <option>Media</option>
+                    <option>Baja</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] text-slate-500 mb-1">
+                  Descripción de la falla
+                </label>
+                <TextArea
+                  icon={MessageCircle}
+                  required
+                  placeholder="Describe qué está pasando, por ejemplo: fuga en el lavamanos del baño principal."
+                  value={newTicket.description}
+                  onChange={(e: any) =>
+                    setNewTicket((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <Button
+                disabled={loading}
+                type="submit"
+                className="w-full mt-2 gap-2"
+              >
+                {loading ? (
+                  'Creando ticket...'
+                ) : (
+                  <>
+                    <Send size={16} />
+                    Crear ticket y notificar
+                  </>
                 )}
-              </div>
-              <Button disabled={loading} type="submit" className="w-full">Guardar Propiedad</Button>
+              </Button>
+
+              <p className="text-[11px] text-slate-400 mt-2">
+                Se enviará una notificación por WhatsApp al centro de KeyhomeKey
+                y luego al proveedor adecuado según la ubicación y el tipo de
+                falla.
+              </p>
             </form>
           </Card>
-        </div>
-      </div>
-    );
-  }
 
-  if (view === 'owner-home') {
-    return (
-      <div className="min-h-screen bg-slate-50 font-sans">
-        <nav className="bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-10">
-          <div className="font-bold text-xl text-indigo-700">KeyhomeKey</div>
-          <button onClick={handleLogout}><LogOut size={20} className="text-slate-400"/></button>
-        </nav>
-        <main className="p-4 max-w-5xl mx-auto space-y-6">
-          <div className="flex justify-between items-center mt-4">
-            <h2 className="text-xl font-bold text-slate-800">Mis Propiedades</h2>
-            <Button onClick={() => setView('add-property')} className="text-sm"><Plus size={18}/> Agregar</Button>
-          </div>
-          {properties.length === 0 && !loading && <p className="text-center text-slate-400 py-10">No tienes propiedades.</p>}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {properties.map(p => (
-              <Card key={p.id} className="relative p-5 hover:shadow-md transition-shadow">
-                <div className={`absolute top-0 left-0 h-full w-1 ${p.is_rented ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
-                <h3 className="font-bold text-lg">{p.address}</h3>
-                <p className="text-slate-500 text-sm mb-2 flex items-center gap-1"><MapPin size={12}/> {p.municipality}, {p.department}</p>
-                {p.is_rented ? (
-                  <div className="bg-emerald-50 p-2 rounded text-xs text-emerald-800 border border-emerald-100">
-                    <p className="font-bold flex gap-1"><UserCheck size={12}/> {p.tenant_name}</p>
-                    <p className="opacity-75">Vence: {p.contract_end_date}</p>
+          {/* LISTA DE TICKETS */}
+          <Card className="p-5">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
+              <Calendar size={16} />
+              Tickets recientes
+            </h3>
+            {tickets.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                Aún no hay tickets registrados.
+              </p>
+            ) : (
+              <div className="space-y-3 max-h-[320px] overflow-auto pr-1">
+                {tickets.map((t) => {
+                  const prop = properties.find((p) => p.id === t.property_id);
+                  return (
+                    <div
+                      key={t.id}
+                      className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50 text-xs flex justify-between gap-2"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-900 flex items-center gap-1">
+                          <Wrench size={13} />
+                          {t.category} ·{' '}
+                          <span className="font-normal text-slate-600">
+                            {t.priority}
+                          </span>
+                        </p>
+                        <p className="text-[11px] text-slate-500 line-clamp-2">
+                          {t.description}
+                        </p>
+                        {prop && (
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            {prop.address} – {prop.municipality}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Reportado por: {t.reporter}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <StatusBadge status={t.status} />
+                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                          <Truck size={11} />
+                          Flujo KeyhomeKey
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* FORMULARIO NUEVO INMUEBLE (solo propietario) */}
+        {userRole === 'OWNER' && (
+          <Card id="add-property" className="p-5">
+            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
+              <Plus size={16} />
+              Registrar nuevo inmueble
+            </h3>
+
+            <form onSubmit={addProperty} className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">
+                    Dirección
+                  </label>
+                  <Input
+                    icon={MapPin}
+                    type="text"
+                    required
+                    placeholder="Calle 123 #45-67 Apto 302"
+                    value={newProp.address}
+                    onChange={(e: any) =>
+                      setNewProp((prev) => ({
+                        ...prev,
+                        address: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">
+                    Tipo de inmueble
+                  </label>
+                  <select
+                    value={newProp.type}
+                    onChange={(e) =>
+                      setNewProp((prev) => ({
+                        ...prev,
+                        type: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
+                  >
+                    <option>Apartamento</option>
+                    <option>Casa</option>
+                    <option>Local</option>
+                    <option>Bodega</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">
+                    Departamento
+                  </label>
+                  <select
+                    required
+                    value={newProp.department}
+                    onChange={(e) => handleDepartmentChange(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
+                  >
+                    <option value="">Selecciona un departamento</option>
+                    {colombiaLocations.map((d) => (
+                      <option key={d.department} value={d.department}>
+                        {d.department}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">
+                    Municipio / ciudad
+                  </label>
+                  <select
+                    required
+                    value={newProp.municipality}
+                    onChange={(e) =>
+                      setNewProp((prev) => ({
+                        ...prev,
+                        municipality: e.target.value,
+                      }))
+                    }
+                    disabled={!newProp.department}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400 disabled:bg-slate-100"
+                  >
+                    <option value="">Selecciona un municipio</option>
+                    {availableCities.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">
+                    Teléfono del propietario (WhatsApp)
+                  </label>
+                  <Input
+                    icon={Phone}
+                    type="tel"
+                    required
+                    placeholder="3001234567"
+                    value={newProp.ownerPhone}
+                    onChange={(e: any) =>
+                      setNewProp((prev) => ({
+                        ...prev,
+                        ownerPhone: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  id="is_rented"
+                  type="checkbox"
+                  checked={newProp.isRented}
+                  onChange={(e) =>
+                    setNewProp((prev) => ({
+                      ...prev,
+                      isRented: e.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                />
+                <label
+                  htmlFor="is_rented"
+                  className="text-[11px] text-slate-600"
+                >
+                  El inmueble está arrendado
+                </label>
+              </div>
+
+              {newProp.isRented && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">
+                      Nombre del inquilino
+                    </label>
+                    <Input
+                      icon={User}
+                      type="text"
+                      required
+                      value={newProp.tenantName}
+                      onChange={(e: any) =>
+                        setNewProp((prev) => ({
+                          ...prev,
+                          tenantName: e.target.value,
+                        }))
+                      }
+                    />
                   </div>
-                ) : <div className="bg-slate-50 p-2 rounded text-center text-xs text-slate-400">Vacante</div>}
-              </Card>
-            ))}
-          </div>
-          <div className="pt-6 border-t"><h2 className="text-xl font-bold text-slate-800 mb-4">Novedades</h2><Button onClick={() => setView('create-ticket')} className="bg-amber-100 text-amber-700 text-sm mb-4">Reportar Daño</Button>
-             <div className="space-y-3">
-               {tickets.map(t => (
-                  <Card key={t.id} className="p-4 flex justify-between items-center">
-                    <div><h4 className="font-bold">{t.category}</h4><p className="text-sm text-slate-600">{t.description}</p></div>
-                    <StatusBadge status={t.status} />
-                  </Card>
-               ))}
-             </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">
+                      Email del inquilino
+                    </label>
+                    <Input
+                      icon={Mail}
+                      type="email"
+                      required
+                      value={newProp.tenantEmail}
+                      onChange={(e: any) =>
+                        setNewProp((prev) => ({
+                          ...prev,
+                          tenantEmail: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">
+                      WhatsApp del inquilino
+                    </label>
+                    <Input
+                      icon={Phone}
+                      type="tel"
+                      required
+                      value={newProp.tenantPhone}
+                      onChange={(e: any) =>
+                        setNewProp((prev) => ({
+                          ...prev,
+                          tenantPhone: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              )}
 
-  // Create Ticket, Tenant Home: Mismo código base, ya actualizados para mostrar ubicación
-  if (view === 'create-ticket') { /* ... Mismo código anterior ... */ 
-    return (
-      <div className="min-h-screen bg-slate-50 p-4 font-sans">
-        <div className="max-w-lg mx-auto">
-          <Button onClick={() => setView(userRole === 'owner' ? 'owner-home' : 'tenant-home')} variant="secondary" className="mb-6">← Cancelar</Button>
-          <Card className="p-6">
-            <h2 className="text-2xl font-bold mb-6 text-amber-600">Reportar Novedad</h2>
-            <form onSubmit={createTicket} className="space-y-4">
-              <select required className="w-full p-3 border rounded-lg bg-white" onChange={(e:any) => setNewTicket({...newTicket, propertyId: e.target.value})}>
-                <option value="">Selecciona inmueble...</option>
-                {properties.map(p => <option key={p.id} value={p.id}>{p.address} ({p.municipality})</option>)}
-              </select>
-              <div className="grid grid-cols-2 gap-4">
-                <select className="w-full p-3 border rounded-lg bg-white" value={newTicket.category} onChange={(e:any) => setNewTicket({...newTicket, category: e.target.value})}>
-                  <option>Plomería</option><option>Electricidad</option><option>Electrodomésticos</option><option>Otros</option>
-                </select>
-                <select className="w-full p-3 border rounded-lg bg-white" value={newTicket.priority} onChange={(e:any) => setNewTicket({...newTicket, priority: e.target.value})}>
-                  <option>Baja</option><option>Media</option><option>Alta</option>
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">
+                    Inicio del contrato (opcional)
+                  </label>
+                  <Input
+                    icon={Calendar}
+                    type="date"
+                    value={newProp.contractStart}
+                    onChange={(e: any) =>
+                      setNewProp((prev) => ({
+                        ...prev,
+                        contractStart: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">
+                    Fin del contrato (opcional)
+                  </label>
+                  <Input
+                    icon={Calendar}
+                    type="date"
+                    value={newProp.contractEnd}
+                    onChange={(e: any) =>
+                      setNewProp((prev) => ({
+                        ...prev,
+                        contractEnd: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
               </div>
-              <textarea required rows={4} placeholder="Detalles..." className="w-full p-3 border rounded-lg" value={newTicket.description} onChange={(e:any) => setNewTicket({...newTicket, description: e.target.value})} />
-              <div className="p-4 bg-blue-50 text-blue-700 text-xs rounded-lg flex gap-2"><Truck size={16} /> Se buscarán proveedores en la zona.</div>
-              <Button disabled={loading} type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-white">Crear Ticket</Button>
+
+              <div className="flex justify-end mt-2">
+                <Button disabled={loading} type="submit" className="gap-2">
+                  {loading ? (
+                    'Guardando...'
+                  ) : (
+                    <>
+                      <CheckCircle size={16} />
+                      Guardar inmueble
+                    </>
+                  )}
+                </Button>
+              </div>
             </form>
           </Card>
-        </div>
-      </div>
-    );
-  }
-
-  if (view === 'tenant-home') { /* ... Mismo código anterior ... */ 
-    return (
-      <div className="min-h-screen bg-slate-50 font-sans">
-         <nav className="bg-white border-b px-4 py-3 flex justify-between items-center sticky top-0 z-10">
-          <div className="font-bold text-xl text-emerald-600">Mi Hogar</div>
-          <button onClick={handleLogout} className="text-slate-400"><LogOut size={20}/></button>
-        </nav>
-        <main className="p-4 max-w-lg mx-auto space-y-6">
-          <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 text-white shadow-xl">
-            <h2 className="text-2xl font-bold mb-1">Bienvenido</h2>
-            {properties.length > 0 ? (
-               <p className="opacity-90 flex items-center gap-2 mt-2"><MapPin size={16}/> {properties[0].address}, {properties[0].municipality}</p>
-            ) : <p className="opacity-90 text-sm mt-2">No se encontró tu propiedad asignada.</p>}
-            <div className="mt-8">
-              <button onClick={() => setView('create-ticket')} className="bg-white text-emerald-600 px-5 py-3 rounded-xl font-bold text-sm shadow-lg w-full">Reportar Problema</button>
-            </div>
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-700 mb-4">Mis Reportes</h3>
-            <div className="space-y-3">
-              {tickets.filter(t => t.reporter === 'Inquilino').map(t => (
-                <Card key={t.id} className="p-4 flex justify-between items-center">
-                  <div><h4 className="font-bold text-slate-800">{t.category}</h4><p className="text-xs text-slate-500">{t.date}</p></div>
-                  <StatusBadge status={t.status} />
-                </Card>
-              ))}
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  return null;
+        )}
+      </main>
+    </div>
+  );
 }
