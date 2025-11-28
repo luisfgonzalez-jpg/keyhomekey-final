@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import { colombiaLocations } from '@/lib/colombiaData';
 
 import {
   Home,
-  User,
+  User as UserIcon,
   Wrench,
   MapPin,
   Plus,
@@ -25,10 +25,10 @@ import {
   FileText,
 } from 'lucide-react';
 
-const KEYHOME_WHATSAPP = '573001234567'; // número general de Keyhomekey
+const KEYHOME_WHATSAPP = '573001234567';
 
 // -----------------------------------------------------------------------------
-// UI BÁSICA
+// UI
 // -----------------------------------------------------------------------------
 
 const Button = ({
@@ -38,14 +38,7 @@ const Button = ({
   variant = 'primary',
   disabled = false,
   className = '',
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  type?: 'button' | 'submit';
-  variant?: 'primary' | 'outline' | 'ghost' | 'danger';
-  disabled?: boolean;
-  className?: string;
-}) => {
+}: any) => {
   const base =
     'inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-offset-2';
 
@@ -59,29 +52,21 @@ const Button = ({
       'bg-red-600 text-white hover:bg-red-500 focus:ring-red-600 border border-transparent',
   };
 
-  const disabledStyle = disabled
-    ? 'opacity-60 cursor-not-allowed'
-    : 'cursor-pointer';
-
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`${base} ${variants[variant]} ${disabledStyle} ${className}`}
+      className={`${base} ${variants[variant]} ${
+        disabled ? 'opacity-60 cursor-not-allowed' : ''
+      } ${className}`}
     >
       {children}
     </button>
   );
 };
 
-const Card = ({
-  children,
-  className = '',
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) => (
+const Card = ({ children, className = '' }: any) => (
   <div
     className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${className}`}
   >
@@ -113,7 +98,7 @@ const TextArea = ({ icon: Icon, ...props }: any) => (
   </div>
 );
 
-const StatusBadge = ({ status }: { status: string }) => {
+const StatusBadge = ({ status }: any) => {
   let color = 'bg-slate-100 text-slate-700';
   if (status === 'Pendiente')
     color = 'bg-amber-100 text-amber-800 border border-amber-200';
@@ -169,7 +154,7 @@ interface Ticket {
 }
 
 // -----------------------------------------------------------------------------
-// PÁGINA PRINCIPAL
+// COMPONENTE PRINCIPAL
 // -----------------------------------------------------------------------------
 
 export default function HomePage() {
@@ -188,7 +173,7 @@ export default function HomePage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
-  // FORM PROPIEDAD
+  // FORM PROPERTY
   const [newProp, setNewProp] = useState({
     address: '',
     type: 'Apartamento',
@@ -232,7 +217,7 @@ export default function HomePage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_evt, session) => {
       setSession(session);
       if (!session) {
         setUserRole(null);
@@ -246,12 +231,11 @@ export default function HomePage() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // FUNCIONES DE NEGOCIO
+  // FUNCIONES PRINCIPALES
   // ---------------------------------------------------------------------------
 
-  const detectRoleAndLoad = async (user: User) => {
+  const detectRoleAndLoad = async (user: SupabaseUser) => {
     try {
-      // 1) Intentar leer el perfil, si existe
       const { data: profile } = await supabase
         .from('users_profiles')
         .select('role')
@@ -260,20 +244,15 @@ export default function HomePage() {
 
       let role: Role = null;
 
-      if (profile?.role === 'TENANT' || profile?.role === 'OWNER') {
+      if (profile?.role === 'OWNER' || profile?.role === 'TENANT') {
         role = profile.role;
       } else {
-        // 2) Si no hay perfil todavía, detectar si es inquilino buscando properties.tenant_email
-        const { data: tenantProps, error: tenantErr } = await supabase
+        const { data: tenantProps } = await supabase
           .from('properties')
           .select('id')
           .eq('tenant_email', user.email);
 
-        if (!tenantErr && tenantProps && tenantProps.length > 0) {
-          role = 'TENANT';
-        } else {
-          role = 'OWNER';
-        }
+        role = tenantProps && tenantProps.length > 0 ? 'TENANT' : 'OWNER';
       }
 
       setUserRole(role);
@@ -284,8 +263,9 @@ export default function HomePage() {
     }
   };
 
-  const fetchData = async (role: Role, user: User) => {
+  const fetchData = async (role: Role, user: SupabaseUser) => {
     if (!role) return;
+
     try {
       if (role === 'OWNER') {
         const { data: propsData } = await supabase
@@ -294,63 +274,58 @@ export default function HomePage() {
           .eq('owner_id', user.id)
           .order('created_at', { ascending: false });
 
-        setProperties((propsData || []) as Property[]);
-      } else if (role === 'TENANT') {
+        setProperties(propsData || []);
+      } else {
         const { data: propsData } = await supabase
           .from('properties')
           .select('*')
-          .eq('tenant_email', user.email)
-          .order('created_at', { ascending: false });
+          .eq('tenant_email', user.email);
 
-        setProperties((propsData || []) as Property[]);
+        setProperties(propsData || []);
       }
 
-      const { data: ticketsData } = await supabase
+      const { data: ticketData } = await supabase
         .from('tickets')
         .select('*')
         .order('created_at', { ascending: false });
 
-      const allTickets = (ticketsData || []) as Ticket[];
+      const propIds = new Set(properties.map((p) => p.id));
 
-      if (role === 'OWNER') {
-        const propIds = new Set(properties.map((p) => p.id));
-        setTickets(allTickets.filter((t) => propIds.has(t.property_id)));
-      } else if (role === 'TENANT') {
-        const propIds = new Set(properties.map((p) => p.id));
-        setTickets(
-          allTickets.filter(
-            (t) => propIds.has(t.property_id) || t.reporter === 'Inquilino',
-          ),
-        );
-      }
-    } catch (error) {
-      console.error('Error fetchData:', error);
+      setTickets(
+        (ticketData || []).filter(
+          (t) =>
+            propIds.has(t.property_id) ||
+            (role === 'TENANT' && t.reporter === 'Inquilino'),
+        ),
+      );
+    } catch (err) {
+      console.error('Error fetchData:', err);
     }
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
+  // ---------------------------------------------------------------------------
+  // AUTH - LOGIN / REGISTRO
+  // ---------------------------------------------------------------------------
+
+  const handleAuth = async (e: any) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       if (authMode === 'signup') {
-        // 1. Crear usuario en Auth
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
         });
 
         if (error) throw error;
+        if (!data.user) throw new Error('Error creando usuario');
 
-        const user = data.user;
-        if (!user) throw new Error('No se pudo obtener el usuario.');
-
-        // 2. Crear perfil OWNER en users_profiles
         const { error: profileError } = await supabase
           .from('users_profiles')
           .insert([
             {
-              user_id: user.id,
+              user_id: data.user.id,
               name: name.trim(),
               email: email.trim(),
               phone: phone.trim(),
@@ -359,33 +334,24 @@ export default function HomePage() {
           ]);
 
         if (profileError) {
-          console.error(profileError);
-          alert(
-            'La cuenta se creó, pero hubo un problema guardando el perfil.',
-          );
-        } else {
-          alert('Registro exitoso. Ahora inicia sesión.');
+          throw new Error('Usuario creado, pero no se creó el perfil');
         }
 
-        // volvemos al modo login
+        alert('Registro exitoso. Inicia sesión.');
         setAuthMode('signin');
       } else {
-        // LOGIN
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-
         if (error) throw error;
+        if (!data.session) throw new Error('No se pudo iniciar sesión');
 
-        if (data.session) {
-          setSession(data.session);
-          await detectRoleAndLoad(data.session.user);
-        }
+        setSession(data.session);
+        await detectRoleAndLoad(data.session.user);
       }
     } catch (err: any) {
-      console.error(err);
-      alert(err.message || 'Error de autenticación.');
+      alert(err.message);
     } finally {
       setLoading(false);
     }
@@ -396,23 +362,24 @@ export default function HomePage() {
     setSession(null);
     setUserRole(null);
     setView('login');
-    setEmail('');
-    setPassword('');
   };
+
+  // ---------------------------------------------------------------------------
+  // FORM INMUEBLE
+  // ---------------------------------------------------------------------------
 
   const handleDepartmentChange = (dept: string) => {
-    setNewProp((prev) => ({ ...prev, department: dept, municipality: '' }));
-    const found = colombiaLocations.find((d) => d.department === dept);
-    setAvailableCities(found ? found.cities : []);
+    setNewProp((p) => ({ ...p, department: dept, municipality: '' }));
+    const dep = colombiaLocations.find((d) => d.department === dept);
+    setAvailableCities(dep ? dep.cities : []);
   };
 
-  const addProperty = async (e: React.FormEvent) => {
+  const addProperty = async (e: any) => {
     e.preventDefault();
     if (!session?.user) return;
 
+    setLoading(true);
     try {
-      setLoading(true);
-
       const { data, error } = await supabase
         .from('properties')
         .insert([
@@ -436,26 +403,19 @@ export default function HomePage() {
 
       if (error) throw error;
 
-      // actualizar lista en pantalla
-      setProperties((prev) => [data as Property, ...prev]);
+      setProperties((prev) => [data, ...prev]);
 
-      // si hay inquilino, enviar invitación por email
       if (newProp.isRented && newProp.tenantEmail) {
-        try {
-          await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: newProp.tenantEmail,
-              propertyAddress: newProp.address,
-            }),
-          });
-        } catch (err) {
-          console.error('Error enviando email de invitación:', err);
-        }
+        await fetch('/api/send-email', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: newProp.tenantEmail,
+            propertyAddress: newProp.address,
+          }),
+        });
       }
 
-      // resetear formulario
+      alert('Inmueble guardado.');
       setNewProp({
         address: '',
         type: 'Apartamento',
@@ -470,27 +430,23 @@ export default function HomePage() {
         contractEnd: '',
       });
       setAvailableCities([]);
-
-      alert('Inmueble guardado correctamente.');
     } catch (err: any) {
-      console.error(err);
-      alert(err.message || 'Error guardando el inmueble.');
+      alert(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const createTicket = async (e: React.FormEvent) => {
+  // ---------------------------------------------------------------------------
+  // FORM TICKET
+  // ---------------------------------------------------------------------------
+
+  const createTicket = async (e: any) => {
     e.preventDefault();
-    if (!session?.user) return;
-    if (!newTicket.propertyId) {
-      alert('Selecciona un inmueble.');
-      return;
-    }
+    if (!newTicket.propertyId) return alert('Selecciona un inmueble');
 
+    setLoading(true);
     try {
-      setLoading(true);
-
       const property = properties.find((p) => p.id === newTicket.propertyId);
 
       const { data, error } = await supabase
@@ -511,22 +467,16 @@ export default function HomePage() {
 
       if (error) throw error;
 
-      setTickets((prev) => [data as Ticket, ...prev]);
+      setTickets((prev) => [data, ...prev]);
 
-      // Abrir WhatsApp para contactar a KeyhomeKey (o luego al proveedor)
       if (property && typeof window !== 'undefined') {
         const text = encodeURIComponent(
-          `Nuevo ticket de ${
-            userRole === 'OWNER' ? 'propietario' : 'inquilino'
-          }.\n\nInmueble: ${property.address} - ${property.municipality}, ${
-            property.department
-          }\nCategoría: ${newTicket.category}\nPrioridad: ${
-            newTicket.priority
-          }\nDescripción: ${newTicket.description}`,
+          `Nuevo ticket.\nInmueble: ${property.address}\nCategoría: ${newTicket.category}\nPrioridad: ${newTicket.priority}\nDescripción: ${newTicket.description}`,
         );
         window.open(`https://wa.me/${KEYHOME_WHATSAPP}?text=${text}`, '_blank');
       }
 
+      alert('Ticket creado correctamente.');
       setNewTicket({
         propertyId: '',
         category: 'Plomería',
@@ -534,18 +484,15 @@ export default function HomePage() {
         priority: 'Media',
         providerOption: 'KeyhomeKey',
       });
-
-      alert('Ticket creado correctamente.');
     } catch (err: any) {
-      console.error(err);
-      alert(err.message || 'Error creando el ticket.');
+      alert(err.message);
     } finally {
       setLoading(false);
     }
   };
 
   // ---------------------------------------------------------------------------
-  // VISTAS
+  // LOGIN VIEW
   // ---------------------------------------------------------------------------
 
   if (view === 'login') {
@@ -561,7 +508,7 @@ export default function HomePage() {
                 KeyhomeKey
               </h1>
               <p className="text-xs text-slate-500">
-                Propietarios, inquilinos y proveedores en un solo lugar.
+                Gestión para propietarios, inquilinos y proveedores
               </p>
             </div>
           </div>
@@ -587,17 +534,18 @@ export default function HomePage() {
             {authMode === 'signup' && (
               <>
                 <Input
-                  icon={User}
+                  icon={UserIcon}
                   type="text"
                   placeholder="Nombre completo"
                   required
                   value={name}
                   onChange={(e: any) => setName(e.target.value)}
                 />
+
                 <Input
                   icon={Phone}
                   type="tel"
-                  placeholder="Teléfono (WhatsApp)"
+                  placeholder="WhatsApp"
                   required
                   value={phone}
                   onChange={(e: any) => setPhone(e.target.value)}
@@ -613,6 +561,7 @@ export default function HomePage() {
               value={email}
               onChange={(e: any) => setEmail(e.target.value)}
             />
+
             <Input
               icon={Lock}
               type="password"
@@ -632,15 +581,17 @@ export default function HomePage() {
           </form>
 
           <p className="mt-6 text-[11px] text-slate-400 text-center">
-            Al continuar aceptas recibir comunicaciones por correo y WhatsApp
-            relacionadas con la gestión de tus inmuebles.
+            Recibirás notificaciones por correo y WhatsApp
           </p>
         </Card>
       </div>
     );
   }
 
-  // DASHBOARD (propietario o inquilino)
+  // ---------------------------------------------------------------------------
+  // DASHBOARD
+  // ---------------------------------------------------------------------------
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
@@ -651,7 +602,7 @@ export default function HomePage() {
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.15em] text-slate-400">
-                Panel {userRole === 'OWNER' ? 'propietario' : 'inquilino'}
+                Panel {userRole === 'OWNER' ? 'Propietario' : 'Inquilino'}
               </p>
               <h2 className="text-sm font-semibold text-slate-900">
                 KeyhomeKey
@@ -663,11 +614,7 @@ export default function HomePage() {
             <StatusBadge
               status={userRole === 'OWNER' ? 'Propietario' : 'Inquilino'}
             />
-            <Button
-              variant="ghost"
-              className="text-xs gap-2"
-              onClick={handleLogout}
-            >
+            <Button variant="ghost" className="text-xs gap-2" onClick={handleLogout}>
               <LogOut size={16} />
               Salir
             </Button>
@@ -675,8 +622,11 @@ export default function HomePage() {
         </div>
       </header>
 
+      {/* CONTINUACIÓN DEL DASHBOARD... */}
+
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {/* BLOQUE DE PROPIEDADES */}
+
+        {/* PROPIEDADES */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 p-5">
             <div className="flex items-center justify-between mb-4">
@@ -684,6 +634,7 @@ export default function HomePage() {
                 <MapPin size={16} />
                 Mis inmuebles
               </h3>
+
               {userRole === 'OWNER' && (
                 <Button
                   variant="outline"
@@ -700,6 +651,7 @@ export default function HomePage() {
               )}
             </div>
 
+            {/* Lista de inmuebles */}
             {properties.length === 0 ? (
               <p className="text-xs text-slate-500">
                 Aún no hay inmuebles registrados.
@@ -739,12 +691,13 @@ export default function HomePage() {
             )}
           </Card>
 
-          {/* TUS ESTADÍSTICAS SENCILLAS */}
+          {/* ESTADÍSTICAS */}
           <Card className="p-5 space-y-4">
             <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <FileText size={16} />
               Resumen
             </h3>
+
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
                 <p className="text-[11px] text-slate-500 mb-1">
@@ -754,6 +707,7 @@ export default function HomePage() {
                   {properties.length}
                 </p>
               </div>
+
               <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
                 <p className="text-[11px] text-slate-500 mb-1">
                   Tickets abiertos
@@ -766,8 +720,10 @@ export default function HomePage() {
           </Card>
         </div>
 
-        {/* FORMULARIO NUEVO TICKET */}
+        {/* FORMULARIO TICKET */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* Nuevo Ticket */}
           <Card className="p-5">
             <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
               <Wrench size={16} />
@@ -775,10 +731,13 @@ export default function HomePage() {
             </h3>
 
             <form onSubmit={createTicket} className="space-y-3 text-xs">
+
+              {/* Inmueble */}
               <div>
                 <label className="block text-[11px] text-slate-500 mb-1">
                   Inmueble
                 </label>
+
                 <select
                   required
                   value={newTicket.propertyId}
@@ -791,6 +750,7 @@ export default function HomePage() {
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
                 >
                   <option value="">Selecciona un inmueble</option>
+
                   {properties.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.address} – {p.municipality}
@@ -799,11 +759,15 @@ export default function HomePage() {
                 </select>
               </div>
 
+              {/* Categoría y Prioridad */}
               <div className="grid grid-cols-2 gap-3">
+
+                {/* Categoría */}
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1">
                     Categoría
                   </label>
+
                   <select
                     value={newTicket.category}
                     onChange={(e) =>
@@ -821,10 +785,13 @@ export default function HomePage() {
                     <option>Otros</option>
                   </select>
                 </div>
+
+                {/* Prioridad */}
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1">
                     Prioridad
                   </label>
+
                   <select
                     value={newTicket.priority}
                     onChange={(e) =>
@@ -842,14 +809,16 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* Descripción */}
               <div>
                 <label className="block text-[11px] text-slate-500 mb-1">
                   Descripción de la falla
                 </label>
+
                 <TextArea
                   icon={MessageCircle}
                   required
-                  placeholder="Describe qué está pasando, por ejemplo: fuga en el lavamanos del baño principal."
+                  placeholder="Describe la falla..."
                   value={newTicket.description}
                   onChange={(e: any) =>
                     setNewTicket((prev) => ({
@@ -860,74 +829,59 @@ export default function HomePage() {
                 />
               </div>
 
-              <Button
-                disabled={loading}
-                type="submit"
-                className="w-full mt-2 gap-2"
-              >
-                {loading ? (
-                  'Creando ticket...'
-                ) : (
-                  <>
-                    <Send size={16} />
-                    Crear ticket y notificar
-                  </>
-                )}
+              <Button disabled={loading} type="submit" className="w-full mt-2 gap-2">
+                <Send size={16} />
+                Crear ticket y notificar
               </Button>
-
-              <p className="text-[11px] text-slate-400 mt-2">
-                Se enviará una notificación por WhatsApp al centro de KeyhomeKey
-                y luego al proveedor adecuado según la ubicación y el tipo de
-                falla.
-              </p>
             </form>
           </Card>
 
-          {/* LISTA DE TICKETS */}
+          {/* Lista de tickets */}
           <Card className="p-5">
             <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
               <Calendar size={16} />
               Tickets recientes
             </h3>
+
             {tickets.length === 0 ? (
               <p className="text-xs text-slate-500">
-                Aún no hay tickets registrados.
+                Aún no hay tickets.
               </p>
             ) : (
               <div className="space-y-3 max-h-[320px] overflow-auto pr-1">
                 {tickets.map((t) => {
                   const prop = properties.find((p) => p.id === t.property_id);
+
                   return (
                     <div
                       key={t.id}
                       className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50 text-xs flex justify-between gap-2"
                     >
+
                       <div>
                         <p className="font-semibold text-slate-900 flex items-center gap-1">
                           <Wrench size={13} />
                           {t.category} ·{' '}
-                          <span className="font-normal text-slate-600">
-                            {t.priority}
-                          </span>
+                          <span className="font-normal text-slate-600">{t.priority}</span>
                         </p>
+
                         <p className="text-[11px] text-slate-500 line-clamp-2">
                           {t.description}
                         </p>
+
                         {prop && (
                           <p className="text-[11px] text-slate-400 mt-1">
                             {prop.address} – {prop.municipality}
                           </p>
                         )}
+
                         <p className="text-[11px] text-slate-400 mt-1">
                           Reportado por: {t.reporter}
                         </p>
                       </div>
+
                       <div className="flex flex-col items-end gap-1">
                         <StatusBadge status={t.status} />
-                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
-                          <Truck size={11} />
-                          Flujo KeyhomeKey
-                        </span>
                       </div>
                     </div>
                   );
@@ -937,16 +891,21 @@ export default function HomePage() {
           </Card>
         </div>
 
-        {/* FORMULARIO NUEVO INMUEBLE (solo propietario) */}
+        {/* FORMULARIO NUEVO INMUEBLE */}
         {userRole === 'OWNER' && (
           <Card id="add-property" className="p-5">
+
             <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
               <Plus size={16} />
               Registrar nuevo inmueble
             </h3>
 
             <form onSubmit={addProperty} className="space-y-3 text-xs">
+
+              {/* Dirección / Tipo */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                {/* Dirección */}
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1">
                     Dirección
@@ -955,17 +914,15 @@ export default function HomePage() {
                     icon={MapPin}
                     type="text"
                     required
-                    placeholder="Calle 123 #45-67 Apto 302"
+                    placeholder="Calle 123 #45-67"
                     value={newProp.address}
                     onChange={(e: any) =>
-                      setNewProp((prev) => ({
-                        ...prev,
-                        address: e.target.value,
-                      }))
+                      setNewProp((p) => ({ ...p, address: e.target.value }))
                     }
                   />
                 </div>
 
+                {/* Tipo */}
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1">
                     Tipo de inmueble
@@ -973,10 +930,7 @@ export default function HomePage() {
                   <select
                     value={newProp.type}
                     onChange={(e) =>
-                      setNewProp((prev) => ({
-                        ...prev,
-                        type: e.target.value,
-                      }))
+                      setNewProp((p) => ({ ...p, type: e.target.value }))
                     }
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
                   >
@@ -988,7 +942,9 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* Ubicación + Teléfono */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1">
                     Departamento
@@ -999,7 +955,8 @@ export default function HomePage() {
                     onChange={(e) => handleDepartmentChange(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
                   >
-                    <option value="">Selecciona un departamento</option>
+                    <option value="">Selecciona</option>
+
                     {colombiaLocations.map((d) => (
                       <option key={d.department} value={d.department}>
                         {d.department}
@@ -1007,23 +964,22 @@ export default function HomePage() {
                     ))}
                   </select>
                 </div>
+
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1">
-                    Municipio / ciudad
+                    Municipio
                   </label>
                   <select
                     required
+                    disabled={!newProp.department}
                     value={newProp.municipality}
                     onChange={(e) =>
-                      setNewProp((prev) => ({
-                        ...prev,
-                        municipality: e.target.value,
-                      }))
+                      setNewProp((p) => ({ ...p, municipality: e.target.value }))
                     }
-                    disabled={!newProp.department}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400 disabled:bg-slate-100"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 disabled:bg-slate-100 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
                   >
-                    <option value="">Selecciona un municipio</option>
+                    <option value="">Selecciona</option>
+
                     {availableCities.map((city) => (
                       <option key={city} value={city}>
                         {city}
@@ -1031,19 +987,19 @@ export default function HomePage() {
                     ))}
                   </select>
                 </div>
+
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1">
-                    Teléfono del propietario (WhatsApp)
+                    WhatsApp del propietario
                   </label>
                   <Input
                     icon={Phone}
-                    type="tel"
                     required
                     placeholder="3001234567"
                     value={newProp.ownerPhone}
                     onChange={(e: any) =>
-                      setNewProp((prev) => ({
-                        ...prev,
+                      setNewProp((p) => ({
+                        ...p,
                         ownerPhone: e.target.value,
                       }))
                     }
@@ -1051,46 +1007,39 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* Inquilino */}
               <div className="flex items-center gap-2 mt-1">
                 <input
-                  id="is_rented"
                   type="checkbox"
+                  id="is_rented"
                   checked={newProp.isRented}
                   onChange={(e) =>
-                    setNewProp((prev) => ({
-                      ...prev,
-                      isRented: e.target.checked,
-                    }))
+                    setNewProp((p) => ({ ...p, isRented: e.target.checked }))
                   }
-                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                 />
-                <label
-                  htmlFor="is_rented"
-                  className="text-[11px] text-slate-600"
-                >
-                  El inmueble está arrendado
+                <label htmlFor="is_rented" className="text-[11px] text-slate-600">
+                  ¿Está arrendado?
                 </label>
               </div>
 
               {newProp.isRented && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
                   <div>
                     <label className="block text-[11px] text-slate-500 mb-1">
                       Nombre del inquilino
                     </label>
                     <Input
-                      icon={User}
-                      type="text"
-                      required
+                      icon={UserIcon}
                       value={newProp.tenantName}
                       onChange={(e: any) =>
-                        setNewProp((prev) => ({
-                          ...prev,
+                        setNewProp((p) => ({
+                          ...p,
                           tenantName: e.target.value,
                         }))
                       }
                     />
                   </div>
+
                   <div>
                     <label className="block text-[11px] text-slate-500 mb-1">
                       Email del inquilino
@@ -1098,28 +1047,26 @@ export default function HomePage() {
                     <Input
                       icon={Mail}
                       type="email"
-                      required
                       value={newProp.tenantEmail}
                       onChange={(e: any) =>
-                        setNewProp((prev) => ({
-                          ...prev,
+                        setNewProp((p) => ({
+                          ...p,
                           tenantEmail: e.target.value,
                         }))
                       }
                     />
                   </div>
+
                   <div>
                     <label className="block text-[11px] text-slate-500 mb-1">
                       WhatsApp del inquilino
                     </label>
                     <Input
                       icon={Phone}
-                      type="tel"
-                      required
                       value={newProp.tenantPhone}
                       onChange={(e: any) =>
-                        setNewProp((prev) => ({
-                          ...prev,
+                        setNewProp((p) => ({
+                          ...p,
                           tenantPhone: e.target.value,
                         }))
                       }
@@ -1128,34 +1075,36 @@ export default function HomePage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Fechas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1">
-                    Inicio del contrato (opcional)
+                    Inicio contrato
                   </label>
                   <Input
                     icon={Calendar}
                     type="date"
                     value={newProp.contractStart}
                     onChange={(e: any) =>
-                      setNewProp((prev) => ({
-                        ...prev,
+                      setNewProp((p) => ({
+                        ...p,
                         contractStart: e.target.value,
                       }))
                     }
                   />
                 </div>
+
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1">
-                    Fin del contrato (opcional)
+                    Fin contrato
                   </label>
                   <Input
                     icon={Calendar}
                     type="date"
                     value={newProp.contractEnd}
                     onChange={(e: any) =>
-                      setNewProp((prev) => ({
-                        ...prev,
+                      setNewProp((p) => ({
+                        ...p,
                         contractEnd: e.target.value,
                       }))
                     }
@@ -1163,16 +1112,11 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="flex justify-end mt-2">
+              {/* Botón */}
+              <div className="flex justify-end mt-3">
                 <Button disabled={loading} type="submit" className="gap-2">
-                  {loading ? (
-                    'Guardando...'
-                  ) : (
-                    <>
-                      <CheckCircle size={16} />
-                      Guardar inmueble
-                    </>
-                  )}
+                  <CheckCircle size={16} />
+                  Guardar inmueble
                 </Button>
               </div>
             </form>
