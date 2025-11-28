@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import { colombiaLocations } from '@/lib/colombiaData';
 
 import {
   Home,
-  User,
+  User as UserIcon,
   Wrench,
   MapPin,
   Plus,
@@ -249,7 +249,7 @@ export default function HomePage() {
   // FUNCIONES DE NEGOCIO
   // ---------------------------------------------------------------------------
 
-  const detectRoleAndLoad = async (user: User) => {
+  const detectRoleAndLoad = async (user: SupabaseUser) => {
     try {
       // 1) Intentar leer el perfil, si existe
       const { data: profile } = await supabase
@@ -284,7 +284,7 @@ export default function HomePage() {
     }
   };
 
-  const fetchData = async (role: Role, user: User) => {
+  const fetchData = async (role: Role, user: SupabaseUser) => {
     if (!role) return;
     try {
       if (role === 'OWNER') {
@@ -587,7 +587,7 @@ export default function HomePage() {
             {authMode === 'signup' && (
               <>
                 <Input
-                  icon={User}
+                  icon={UserIcon}
                   type="text"
                   placeholder="Nombre completo"
                   required
@@ -1079,7 +1079,7 @@ export default function HomePage() {
                       Nombre del inquilino
                     </label>
                     <Input
-                      icon={User}
+                      icon={UserIcon}
                       type="text"
                       required
                       value={newProp.tenantName}
