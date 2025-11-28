@@ -1004,8 +1004,8 @@ export default function HomePage() {
                   >
                     <option value="">Selecciona un departamento</option>
                     {colombiaLocations.map((d) => (
-                      <option key={d.departmento} value={d.departmento}>
-                        {d.departmento}
+                      <option key={d.departamento} value={d.departamento}>
+                        {d.departamento}
                       </option>
                     ))}
                   </select>
