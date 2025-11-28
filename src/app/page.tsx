@@ -78,11 +78,14 @@ const Button = ({
 const Card = ({
   children,
   className = '',
+  id,
 }: {
   children: React.ReactNode;
   className?: string;
+  id?: string;
 }) => (
   <div
+    id={id}
     className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${className}`}
   >
     {children}
