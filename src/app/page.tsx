@@ -401,10 +401,10 @@ export default function HomePage() {
   };
 
   const handleDepartmentChange = (dept: string) => {
-    setNewProp((prev) => ({ ...prev, department: dept, municipality: '' }));
-    const found = colombiaLocations.find((d) => d.department === dept);
-    setAvailableCities(found ? found.cities : []);
-  };
+  setNewProp((prev) => ({ ...prev, department: dept, municipality: '' }));
+  const found = colombiaLocations.find((d) => d.departamento === dept);
+  setAvailableCities(found ? found.ciudades : []);
+};
 
   const addProperty = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1001,8 +1001,8 @@ export default function HomePage() {
                   >
                     <option value="">Selecciona un departamento</option>
                     {colombiaLocations.map((d) => (
-                      <option key={d.department} value={d.department}>
-                        {d.department}
+                      <option key={d.departmento} value={d.departmento}>
+                        {d.departmento}
                       </option>
                     ))}
                   </select>
