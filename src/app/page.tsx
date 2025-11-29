@@ -141,7 +141,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 // TIPOS
 // -----------------------------------------------------------------------------
 
-type Role = 'OWNER' | 'TENANT' | null;
+type Role = 'OWNER' | 'TENANT' | 'PROVIDER' | null;
 
 interface Property {
   id: string;
@@ -253,82 +253,132 @@ export default function HomePage() {
 
   const detectRoleAndLoad = async (user: SupabaseUser) => {
     try {
-      // 1) Intentar leer el perfil, si existe
-      const { data: profile } = await supabase
-        .from('users_profiles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
+  const detectRoleAndLoad = async (user: SupabaseUser) => {
+  try {
+    // 1) Intentar leer el perfil del usuario
+    const { data: profile, error: profileError } = await supabase
+      .from('users_profiles')
+      .select('id, name, email, phone, role')
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-      let role: Role = null;
+    let role: Role = null;
 
-      if (profile?.role === 'TENANT' || profile?.role === 'OWNER') {
-        role = profile.role;
+    // 2) Si el perfil existe y tiene un role válido, lo usamos
+    if (!profileError && profile?.role) {
+      if (
+        profile.role === 'OWNER' ||
+        profile.role === 'TENANT' ||
+        profile.role === 'PROVIDER'
+      ) {
+        role = profile.role as Role;
+      }
+    }
+
+    // 3) Si no hay role en el perfil, lo detectamos por propiedades
+    if (!role) {
+      const { data: tenantProps, error: tenantErr } = await supabase
+        .from('properties')
+        .select('id')
+        .eq('tenant_email', user.email)
+        .limit(1);
+
+      if (!tenantErr && tenantProps && tenantProps.length > 0) {
+        role = 'TENANT';
       } else {
-        // 2) Si no hay perfil todavía, detectar si es inquilino buscando properties.tenant_email
-        const { data: tenantProps, error: tenantErr } = await supabase
-          .from('properties')
-          .select('id')
-          .eq('tenant_email', user.email);
+        role = 'OWNER'; // por defecto propietario
+      }
 
-        if (!tenantErr && tenantProps && tenantProps.length > 0) {
-          role = 'TENANT';
-        } else {
-          role = 'OWNER';
+      // 4) Si no había perfil, lo creamos automáticamente con el role detectado
+      if (!profile) {
+        const guessedName =
+          user.email?.split('@')[0] || 'Usuario KeyhomeKey';
+
+        const { error: insertError } = await supabase
+          .from('users_profiles')
+          .insert([
+            {
+              user_id: user.id,
+              name: guessedName,
+              email: user.email,
+              phone: '',
+              role,
+            },
+          ]);
+
+        if (insertError) {
+          console.error(
+            'Error creando perfil automático en users_profiles:',
+            insertError,
+          );
         }
       }
-
-      setUserRole(role);
-      setView('dashboard');
-      await fetchData(role, user);
-    } catch (error) {
-      console.error('Error detectRoleAndLoad:', error);
     }
-  };
 
-  const fetchData = async (role: Role, user: SupabaseUser) => {
-    if (!role) return;
-    try {
-      if (role === 'OWNER') {
-        const { data: propsData } = await supabase
-          .from('properties')
-          .select('*')
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false });
+    setUserRole(role);
+    setView('dashboard');
+    await fetchData(role, user);
+  } catch (error) {
+    console.error('Error detectRoleAndLoad:', error);
+  }
+};
 
-        setProperties((propsData || []) as Property[]);
-      } else if (role === 'TENANT') {
-        const { data: propsData } = await supabase
-          .from('properties')
-          .select('*')
-          .eq('tenant_email', user.email)
-          .order('created_at', { ascending: false });
+const fetchData = async (role: Role, user: SupabaseUser) => {
+  if (!role) return;
 
-        setProperties((propsData || []) as Property[]);
-      }
+  try {
+    let propsData: Property[] = [];
 
-      const { data: ticketsData } = await supabase
-        .from('tickets')
+    if (role === 'OWNER') {
+      const { data } = await supabase
+        .from('properties')
         .select('*')
+        .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
 
-      const allTickets = (ticketsData || []) as Ticket[];
+      propsData = (data || []) as Property[];
+    } else if (role === 'TENANT') {
+      const { data } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('tenant_email', user.email)
+        .order('created_at', { ascending: false });
 
-      if (role === 'OWNER') {
-        const propIds = new Set(properties.map((p) => p.id));
-        setTickets(allTickets.filter((t) => propIds.has(t.property_id)));
-      } else if (role === 'TENANT') {
-        const propIds = new Set(properties.map((p) => p.id));
-        setTickets(
-          allTickets.filter(
-            (t) => propIds.has(t.property_id) || t.reporter === 'Inquilino',
-          ),
-        );
-      }
-    } catch (error) {
-      console.error('Error fetchData:', error);
+      propsData = (data || []) as Property[];
+    } else if (role === 'PROVIDER') {
+      // Más adelante aquí filtraremos por proveedor
+      propsData = [];
     }
-  };
+
+    setProperties(propsData);
+
+    // Tickets
+    const { data: ticketsData } = await supabase
+      .from('tickets')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    const allTickets = (ticketsData || []) as Ticket[];
+
+    if (role === 'OWNER') {
+      const propIds = new Set(propsData.map((p) => p.id));
+      setTickets(allTickets.filter((t) => propIds.has(t.property_id)));
+    } else if (role === 'TENANT') {
+      const propIds = new Set(propsData.map((p) => p.id));
+      setTickets(
+        allTickets.filter(
+          (t) => propIds.has(t.property_id) || t.reporter === 'Inquilino',
+        ),
+      );
+    } else if (role === 'PROVIDER') {
+      // Por ahora mostramos todos; luego filtramos por cobertura
+      setTickets(allTickets);
+    }
+  } catch (error) {
+    console.error('Error fetchData:', error);
+  }
+};
+
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -336,7 +386,7 @@ export default function HomePage() {
 
     try {
       if (authMode === 'signup') {
-        // 1. Crear usuario en Auth
+        // 1. Crear usuario en Supabase Auth
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -347,7 +397,7 @@ export default function HomePage() {
         const user = data.user;
         if (!user) throw new Error('No se pudo obtener el usuario.');
 
-        // 2. Crear perfil OWNER en users_profiles
+        // 2. Crear perfil en user_profiles como OWNER por defecto
         const { error: profileError } = await supabase
           .from('users_profiles')
           .insert([
@@ -363,7 +413,7 @@ export default function HomePage() {
         if (profileError) {
           console.error(profileError);
           alert(
-            'La cuenta se creó, pero hubo un problema guardando el perfil.',
+            'La cuenta se creó, pero hubo un problema guardando el perfil en KeyhomeKey.',
           );
         } else {
           alert('Registro exitoso. Ahora inicia sesión.');
@@ -371,6 +421,7 @@ export default function HomePage() {
 
         // volvemos al modo login
         setAuthMode('signin');
+        setPassword('');
       } else {
         // LOGIN
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -380,7 +431,7 @@ export default function HomePage() {
 
         if (error) throw error;
 
-        if (data.session) {
+        if (!data.session) throw new Error('No se pudo iniciar sesión.')
           setSession(data.session);
           await detectRoleAndLoad(data.session.user);
         }
@@ -549,6 +600,12 @@ export default function HomePage() {
   // ---------------------------------------------------------------------------
   // VISTAS
   // ---------------------------------------------------------------------------
+const getRoleLabel = (role: Role) => {
+  if (role === 'OWNER') return 'Propietario';
+  if (role === 'TENANT') return 'Inquilino';
+  if (role === 'PROVIDER') return 'Proveedor';
+  return 'Usuario';
+};
 
   if (view === 'login') {
     return (
@@ -653,7 +710,7 @@ export default function HomePage() {
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.15em] text-slate-400">
-                Panel {userRole === 'OWNER' ? 'propietario' : 'inquilino'}
+                Panel {getRoleLabel(userRole || null).toLowerCase()}
               </p>
               <h2 className="text-sm font-semibold text-slate-900">
                 KeyhomeKey
@@ -663,8 +720,8 @@ export default function HomePage() {
 
           <div className="flex items-center gap-3">
             <StatusBadge
-              status={userRole === 'OWNER' ? 'Propietario' : 'Inquilino'}
-            />
+              <StatusBadge status={getRoleLabel(userRole || null)} />
+          
             <Button
               variant="ghost"
               className="text-xs gap-2"
