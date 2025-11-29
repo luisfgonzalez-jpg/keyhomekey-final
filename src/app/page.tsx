@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
+import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
 import { colombiaLocations } from '@/lib/colombiaData';
 
@@ -25,7 +25,7 @@ import {
   FileText,
 } from 'lucide-react';
 
-const KEYHOME_WHATSAPP = '573001234567'; // número general de Keyhomekey
+const KEYHOME_WHATSAPP = '573001234567'; // número general de KeyhomeKey
 
 // -----------------------------------------------------------------------------
 // UI BÁSICA
@@ -78,11 +78,9 @@ const Button = ({
 const Card = ({
   children,
   className = '',
-  id,
 }: {
   children: React.ReactNode;
   className?: string;
-  id?: string;
 }) => (
   <div
     className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${className}`}
@@ -253,132 +251,129 @@ export default function HomePage() {
 
   const detectRoleAndLoad = async (user: SupabaseUser) => {
     try {
-  const detectRoleAndLoad = async (user: SupabaseUser) => {
-  try {
-    // 1) Intentar leer el perfil del usuario
-    const { data: profile, error: profileError } = await supabase
-      .from('users_profiles')
-      .select('id, name, email, phone, role')
-      .eq('user_id', user.id)
-      .maybeSingle();
+      // 1) Intentar leer el perfil del usuario
+      const { data: profile, error: profileError } = await supabase
+        .from('users_profiles')
+        .select('id, name, email, phone, role')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-    let role: Role = null;
+      let role: Role = null;
 
-    // 2) Si el perfil existe y tiene un role válido, lo usamos
-    if (!profileError && profile?.role) {
-      if (
-        profile.role === 'OWNER' ||
-        profile.role === 'TENANT' ||
-        profile.role === 'PROVIDER'
-      ) {
-        role = profile.role as Role;
-      }
-    }
-
-    // 3) Si no hay role en el perfil, lo detectamos por propiedades
-    if (!role) {
-      const { data: tenantProps, error: tenantErr } = await supabase
-        .from('properties')
-        .select('id')
-        .eq('tenant_email', user.email)
-        .limit(1);
-
-      if (!tenantErr && tenantProps && tenantProps.length > 0) {
-        role = 'TENANT';
-      } else {
-        role = 'OWNER'; // por defecto propietario
-      }
-
-      // 4) Si no había perfil, lo creamos automáticamente con el role detectado
-      if (!profile) {
-        const guessedName =
-          user.email?.split('@')[0] || 'Usuario KeyhomeKey';
-
-        const { error: insertError } = await supabase
-          .from('users_profiles')
-          .insert([
-            {
-              user_id: user.id,
-              name: guessedName,
-              email: user.email,
-              phone: '',
-              role,
-            },
-          ]);
-
-        if (insertError) {
-          console.error(
-            'Error creando perfil automático en users_profiles:',
-            insertError,
-          );
+      // 2) Si el perfil existe y tiene un role válido, lo usamos
+      if (!profileError && profile?.role) {
+        if (
+          profile.role === 'OWNER' ||
+          profile.role === 'TENANT' ||
+          profile.role === 'PROVIDER'
+        ) {
+          role = profile.role as Role;
         }
       }
+
+      // 3) Si no hay role en el perfil, lo detectamos por propiedades
+      if (!role) {
+        const { data: tenantProps, error: tenantErr } = await supabase
+          .from('properties')
+          .select('id')
+          .eq('tenant_email', user.email)
+          .limit(1);
+
+        if (!tenantErr && tenantProps && tenantProps.length > 0) {
+          role = 'TENANT';
+        } else {
+          role = 'OWNER'; // por defecto propietario
+        }
+
+        // 4) Si no había perfil, lo creamos automáticamente con el role detectado
+        if (!profile) {
+          const guessedName =
+            user.email?.split('@')[0] || 'Usuario KeyhomeKey';
+
+          const { error: insertError } = await supabase
+            .from('users_profiles')
+            .insert([
+              {
+                user_id: user.id,
+                name: guessedName,
+                email: user.email,
+                phone: '',
+                role,
+              },
+            ]);
+
+          if (insertError) {
+            console.error(
+              'Error creando perfil automático en users_profiles:',
+              insertError,
+            );
+          }
+        }
+      }
+
+      setUserRole(role);
+      setView('dashboard');
+      await fetchData(role, user);
+    } catch (error) {
+      console.error('Error detectRoleAndLoad:', error);
     }
+  };
 
-    setUserRole(role);
-    setView('dashboard');
-    await fetchData(role, user);
-  } catch (error) {
-    console.error('Error detectRoleAndLoad:', error);
-  }
-};
+  const fetchData = async (role: Role, user: SupabaseUser) => {
+    if (!role) return;
 
-const fetchData = async (role: Role, user: SupabaseUser) => {
-  if (!role) return;
+    try {
+      let propsData: Property[] = [];
 
-  try {
-    let propsData: Property[] = [];
+      if (role === 'OWNER') {
+        const { data } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('owner_id', user.id)
+          .order('created_at', { ascending: false });
 
-    if (role === 'OWNER') {
-      const { data } = await supabase
-        .from('properties')
+        propsData = (data || []) as Property[];
+      } else if (role === 'TENANT') {
+        const { data } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('tenant_email', user.email)
+          .order('created_at', { ascending: false });
+
+        propsData = (data || []) as Property[];
+      } else if (role === 'PROVIDER') {
+        // Más adelante aquí filtraremos por proveedor
+        propsData = [];
+      }
+
+      setProperties(propsData);
+
+      // Tickets
+      const { data: ticketsData } = await supabase
+        .from('tickets')
         .select('*')
-        .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
 
-      propsData = (data || []) as Property[];
-    } else if (role === 'TENANT') {
-      const { data } = await supabase
-        .from('properties')
-        .select('*')
-        .eq('tenant_email', user.email)
-        .order('created_at', { ascending: false });
+      const allTickets = (ticketsData || []) as Ticket[];
 
-      propsData = (data || []) as Property[];
-    } else if (role === 'PROVIDER') {
-      // Más adelante aquí filtraremos por proveedor
-      propsData = [];
+      if (role === 'OWNER') {
+        const propIds = new Set(propsData.map((p) => p.id));
+        setTickets(allTickets.filter((t) => propIds.has(t.property_id)));
+      } else if (role === 'TENANT') {
+        const propIds = new Set(propsData.map((p) => p.id));
+        setTickets(
+          allTickets.filter(
+            (t) => propIds.has(t.property_id) || t.reporter === 'Inquilino',
+          ),
+        );
+      } else if (role === 'PROVIDER') {
+        // Por ahora mostramos todos; luego filtramos por cobertura
+        setTickets(allTickets);
+      }
+    } catch (error) {
+      console.error('Error fetchData:', error);
     }
-
-    setProperties(propsData);
-
-    // Tickets
-    const { data: ticketsData } = await supabase
-      .from('tickets')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    const allTickets = (ticketsData || []) as Ticket[];
-
-    if (role === 'OWNER') {
-      const propIds = new Set(propsData.map((p) => p.id));
-      setTickets(allTickets.filter((t) => propIds.has(t.property_id)));
-    } else if (role === 'TENANT') {
-      const propIds = new Set(propsData.map((p) => p.id));
-      setTickets(
-        allTickets.filter(
-          (t) => propIds.has(t.property_id) || t.reporter === 'Inquilino',
-        ),
-      );
-    } else if (role === 'PROVIDER') {
-      // Por ahora mostramos todos; luego filtramos por cobertura
-      setTickets(allTickets);
-    }
-  } catch (error) {
-    console.error('Error fetchData:', error);
-  }
-};
-
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,9 +390,9 @@ const fetchData = async (role: Role, user: SupabaseUser) => {
         if (error) throw error;
 
         const user = data.user;
-        if (!user) throw new Error('No se pudo obtener el usuario.');
+        if (!user) throw new Error('No se pudo crear el usuario.');
 
-        // 2. Crear perfil en user_profiles como OWNER por defecto
+        // 2. Crear perfil en users_profiles como OWNER por defecto
         const { error: profileError } = await supabase
           .from('users_profiles')
           .insert([
@@ -419,7 +414,7 @@ const fetchData = async (role: Role, user: SupabaseUser) => {
           alert('Registro exitoso. Ahora inicia sesión.');
         }
 
-        // volvemos al modo login
+        // Volvemos al modo login
         setAuthMode('signin');
         setPassword('');
       } else {
@@ -430,11 +425,10 @@ const fetchData = async (role: Role, user: SupabaseUser) => {
         });
 
         if (error) throw error;
+        if (!data.session) throw new Error('No se pudo iniciar sesión.');
 
-        if (!data.session) throw new Error('No se pudo iniciar sesión.')
-          setSession(data.session);
-          await detectRoleAndLoad(data.session.user);
-        }
+        setSession(data.session);
+        await detectRoleAndLoad(data.session.user);
       }
     } catch (err: any) {
       console.error(err);
@@ -454,10 +448,10 @@ const fetchData = async (role: Role, user: SupabaseUser) => {
   };
 
   const handleDepartmentChange = (dept: string) => {
-  setNewProp((prev) => ({ ...prev, department: dept, municipality: '' }));
-  const found = colombiaLocations.find((d) => d.departamento === dept);
-  setAvailableCities(found ? found.ciudades : []);
-};
+    setNewProp((prev) => ({ ...prev, department: dept, municipality: '' }));
+    const found = colombiaLocations.find((d) => d.departamento === dept);
+    setAvailableCities(found ? found.ciudades : []);
+  };
 
   const addProperty = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -600,12 +594,13 @@ const fetchData = async (role: Role, user: SupabaseUser) => {
   // ---------------------------------------------------------------------------
   // VISTAS
   // ---------------------------------------------------------------------------
-const getRoleLabel = (role: Role) => {
-  if (role === 'OWNER') return 'Propietario';
-  if (role === 'TENANT') return 'Inquilino';
-  if (role === 'PROVIDER') return 'Proveedor';
-  return 'Usuario';
-};
+
+  const getRoleLabel = (role: Role) => {
+    if (role === 'OWNER') return 'Propietario';
+    if (role === 'TENANT') return 'Inquilino';
+    if (role === 'PROVIDER') return 'Proveedor';
+    return 'Usuario';
+  };
 
   if (view === 'login') {
     return (
@@ -719,9 +714,7 @@ const getRoleLabel = (role: Role) => {
           </div>
 
           <div className="flex items-center gap-3">
-            <StatusBadge
-              <StatusBadge status={getRoleLabel(userRole || null)} />
-          
+            <StatusBadge status={getRoleLabel(userRole || null)} />
             <Button
               variant="ghost"
               className="text-xs gap-2"
@@ -1060,8 +1053,8 @@ const getRoleLabel = (role: Role) => {
                   >
                     <option value="">Selecciona un departamento</option>
                     {colombiaLocations.map((d) => (
-                      <option key={d.department} value={d.department}>
-                        {d.department}
+                      <option key={d.departamento} value={d.departamento}>
+                        {d.departamento}
                       </option>
                     ))}
                   </select>
