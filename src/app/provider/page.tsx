@@ -146,7 +146,7 @@ export default function ProviderPage() {
     setDepartment(dept);
     setMunicipality('');
     const found = colombiaLocations.find((d) => d.departamento === dept);
-    setAvailableCities(found ? found.cities : []);
+    setAvailableCities(found ? found.ciudades : []);
   };
 
   // ---------------------------------------------------------------------------
