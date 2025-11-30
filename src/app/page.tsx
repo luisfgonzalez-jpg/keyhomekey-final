@@ -252,15 +252,8 @@ export default function HomePage() {
   // FUNCIONES DE NEGOCIO
   // ---------------------------------------------------------------------------
 
-  const detectRoleAndLoad = async (user: SupabaseUser) => {
-    try {
-      // 1) Intentar leer el perfil del usuario
-      const { data: profile, error: profileError } = await supabase
-        .from('users_profiles')
-        .select('id, name, email, phone, role')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
+  
+            
       let role: Role = null;
 
       // 2) Si el perfil existe y tiene un role válido, lo usamos
@@ -384,7 +377,7 @@ export default function HomePage() {
 
     try {
       if (authMode === 'signup') {
-        // 1. Crear usuario en Supabase Auth
+        // 1. Crear usuario en Auth
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -393,9 +386,9 @@ export default function HomePage() {
         if (error) throw error;
 
         const user = data.user;
-        if (!user) throw new Error('No se pudo crear el usuario.');
+        if (!user) throw new Error('No se pudo obtener el usuario.');
 
-        // 2. Crear perfil en users_profiles como OWNER por defecto
+        // 2. Crear perfil en users_profiles 
         const { error: profileError } = await supabase
           .from('users_profiles')
           .insert([
@@ -408,13 +401,14 @@ export default function HomePage() {
             },
           ]);
 
-        if (profileError) {
+        if (profileError)  {
           console.error(profileError);
           alert(
             'La cuenta se creó, pero hubo un problema guardando el perfil en KeyhomeKey.',
           );
-        } else {
-          alert('Registro exitoso. Ahora inicia sesión.');
+          return;
+        } 
+          alert('Usuario registrado con éxito.');
         }
 
         // Volvemos al modo login
