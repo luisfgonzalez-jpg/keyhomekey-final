@@ -341,8 +341,8 @@ export default function ProviderPage() {
                     >
                       <option value="">Selecciona un departamento</option>
                       {colombiaLocations.map((d) => (
-                        <option key={d.department} value={d.department}>
-                          {d.department}
+                        <option key={d.departamento} value={d.departamento}>
+                          {d.departamento}
                         </option>
                       ))}
                     </select>
