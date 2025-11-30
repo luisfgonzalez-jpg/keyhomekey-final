@@ -145,7 +145,7 @@ export default function ProviderPage() {
   const handleDepartmentChange = (dept: string) => {
     setDepartment(dept);
     setMunicipality('');
-    const found = colombiaLocations.find((d) => d.department === dept);
+    const found = colombiaLocations.find((d) => d.departamento === dept);
     setAvailableCities(found ? found.cities : []);
   };
 
