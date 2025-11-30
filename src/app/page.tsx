@@ -309,11 +309,41 @@ export default function HomePage() {
 
       setUserRole(role);
       setView('dashboard');
-      await fetchData(role, user);
+      await detectRoleAndLoad(user);
     } catch (error) {
       console.error('Error detectRoleAndLoad:', error);
     }
   };
+const detectRoleAndLoad = async (user: SupabaseUser) => {
+  try {
+    // Leer perfil
+    const { data: profile, error } = await supabase
+      .from('users_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error) throw error;
+
+    const role = profile.role;
+    setUserRole(role); // ya existe en tu código
+
+    // Redirección según rol
+    if (role === 'OWNER') {
+      Router.push('/owner/dashboard');
+    } else if (role === 'TENANT') {
+      Router.push('/tenant/dashboard');
+    } else if (role === 'PROVIDER') {
+      Router.push('/provider/dashboard');
+    } else {
+      console.warn('Usuario sin rol asignado.');
+    }
+
+    return role;
+  } catch (error) {
+    console.error('Error detectRoleAndLoad:', error);
+  }
+};
 
   const fetchData = async (role: Role, user: SupabaseUser) => {
     if (!role) return;
