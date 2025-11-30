@@ -85,7 +85,7 @@ const Card = ({
   id?: string;
 }) => (
   <div
-  id={id}
+    id={id}
     className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${className}`}
   >
     {children}
@@ -226,11 +226,13 @@ export default function HomePage() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       if (session) {
         setSession(session);
         await detectRoleAndLoad(session.user);
       }
     };
+
     checkSession();
 
     const {
@@ -252,8 +254,81 @@ export default function HomePage() {
   // FUNCIONES DE NEGOCIO
   // ---------------------------------------------------------------------------
 
-  
-            
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (authMode === 'signup') {
+        // 1. Crear usuario en Auth
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        const user = data.user;
+        if (!user) throw new Error('No se pudo obtener el usuario.');
+
+        // 2. Crear perfil en users_profiles como OWNER por defecto
+        const { error: profileError } = await supabase
+          .from('users_profiles')
+          .insert([
+            {
+              user_id: user.id,
+              name: name.trim(),
+              email: email.trim(),
+              phone: phone.trim(),
+              role: 'OWNER',
+            },
+          ]);
+
+        if (profileError) {
+          console.error(profileError);
+          alert(
+            'La cuenta se creó, pero hubo un problema guardando el perfil en KeyhomeKey.',
+          );
+          return;
+        }
+
+        alert('Usuario registrado con éxito.');
+
+        // Volvemos al modo login
+        setAuthMode('signin');
+        setPassword('');
+      } else {
+        // LOGIN
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+        if (!data.session) throw new Error('No se pudo iniciar sesión.');
+
+        setSession(data.session);
+        await detectRoleAndLoad(data.session.user);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error de autenticación.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const detectRoleAndLoad = async (user: SupabaseUser | null) => {
+    try {
+      if (!user) return;
+
+      // 1) Obtener perfil del usuario
+      const { data: profile, error: profileError } = await supabase
+        .from('users_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
       let role: Role = null;
 
       // 2) Si el perfil existe y tiene un role válido, lo usamos
@@ -307,43 +382,14 @@ export default function HomePage() {
         }
       }
 
+      // 5) Actualizamos estado y cargamos datos
       setUserRole(role);
       setView('dashboard');
-      await detectRoleAndLoad(user);
+      await fetchData(role, user);
     } catch (error) {
       console.error('Error detectRoleAndLoad:', error);
     }
   };
-const detectRoleAndLoad = async (user: SupabaseUser) => {
-  try {
-    // Leer perfil
-    const { data: profile, error } = await supabase
-      .from('users_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (error) throw error;
-
-    const role = profile.role;
-    setUserRole(role); // ya existe en tu código
-
-    // Redirección según rol
-    if (role === 'OWNER') {
-      Router.push('/owner/dashboard');
-    } else if (role === 'TENANT') {
-      Router.push('/tenant/dashboard');
-    } else if (role === 'PROVIDER') {
-      Router.push('/provider/dashboard');
-    } else {
-      console.warn('Usuario sin rol asignado.');
-    }
-
-    return role;
-  } catch (error) {
-    console.error('Error detectRoleAndLoad:', error);
-  }
-};
 
   const fetchData = async (role: Role, user: SupabaseUser) => {
     if (!role) return;
@@ -398,70 +444,6 @@ const detectRoleAndLoad = async (user: SupabaseUser) => {
       }
     } catch (error) {
       console.error('Error fetchData:', error);
-    }
-  };
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      if (authMode === 'signup') {
-        // 1. Crear usuario en Auth
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
-        const user = data.user;
-        if (!user) throw new Error('No se pudo obtener el usuario.');
-
-        // 2. Crear perfil en users_profiles 
-        const { error: profileError } = await supabase
-          .from('users_profiles')
-          .insert([
-            {
-              user_id: user.id,
-              name: name.trim(),
-              email: email.trim(),
-              phone: phone.trim(),
-              role: 'OWNER',
-            },
-          ]);
-
-        if (profileError)  {
-          console.error(profileError);
-          alert(
-            'La cuenta se creó, pero hubo un problema guardando el perfil en KeyhomeKey.',
-          );
-          return;
-        } 
-          alert('Usuario registrado con éxito.');
-        }
-
-        // Volvemos al modo login
-        setAuthMode('signin');
-        setPassword('');
-      } else {
-        // LOGIN
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-        if (!data.session) throw new Error('No se pudo iniciar sesión.');
-
-        setSession(data.session);
-        await detectRoleAndLoad(data.session.user);
-      }
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || 'Error de autenticación.');
-    } finally {
-      setLoading(false);
     }
   };
 
