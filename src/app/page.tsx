@@ -232,15 +232,7 @@ export default function HomePage() {
     priority: 'Media',
   });
 
-  const createTicket = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!session?.user) return;
-
-    if (!newTicket.propertyId) {
-      alert('Selecciona un inmueble.');
-      return;
-    }
-
+  
     try {
       setLoading(true);
 
@@ -889,8 +881,40 @@ if (mediaPaths.length > 0) {
   .select()
   .single();
 
-
     if (error) throw error;
+    // 3) Subir archivos al bucket
+const mediaPaths: string[] = [];
+
+for (const file of ticketFiles) {
+  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  const path = `tickets/${data.id}/${Date.now()}-${safeName}`;
+
+  const { error: uploadError } = await supabase
+    .from('tickets-media')
+    .upload(path, file);
+
+  if (uploadError) {
+    console.error('Error subiendo archivo', uploadError);
+    continue;
+  }
+
+  mediaPaths.push(path);
+}
+
+// 4) Actualizar ticket con media_urls
+if (mediaPaths.length > 0) {
+  const { error: updateError } = await supabase
+    .from('tickets')
+    .update({ media_urls: mediaPaths })
+    .eq('id', data.id);
+
+  if (updateError) {
+    console.error('Error actualizando media_urls', updateError);
+  } else {
+    (data as any).media_urls = mediaPaths;
+  }
+}
+
 
     setTickets((prev) => [data as Ticket, ...prev]);
 
