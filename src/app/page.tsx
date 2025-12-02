@@ -818,9 +818,9 @@ Proveedor sugerido:
 - Ciudad: ${assignedProvider.municipality || ''}, ${
             assignedProvider.department || ''
           }`
-        : '
+        : `
 
-Aún no hay proveedor asociado. KeyhomeKey asignará uno.';
+Aún no hay proveedor asociado. KeyhomeKey asignará uno.`;
 
       const text = encodeURIComponent(
         `Nuevo ticket de ${
@@ -1020,3 +1020,169 @@ Descripción: ${newTicket.description}${providerText}`,
                 </Button>
               )}
             </div>
+
+            {/* Ticket Creation Form */}
+            {userRole === 'OWNER' && properties.length > 0 && (
+              <div className="mt-8 border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4">Crear Ticket / Reportar Incidencia</h3>
+                <form
+                  onSubmit={createTicket}
+                  className="space-y-4"
+                >
+                  {/* Property Select */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Inmueble</label>
+                    <select
+                      value={newTicket.propertyId}
+                      onChange={(e) =>
+                        setNewTicket({ ...newTicket, propertyId: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Selecciona un inmueble</option>
+                      {properties.map((prop) => (
+                        <option key={prop.id} value={prop.id}>
+                          {prop.address} - {prop.municipality}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Category Select */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Categoría</label>
+                    <select
+                      value={newTicket.category}
+                      onChange={(e) =>
+                        setNewTicket({ ...newTicket, category: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Selecciona una categoría</option>
+                      <option value="Plomería">Plomería</option>
+                      <option value="Electricidad">Electricidad</option>
+                      <option value="Daño">Daño</option>
+                      <option value="Mantenimiento">Mantenimiento</option>
+                      <option value="Reparación">Reparación</option>
+                      <option value="Limpieza">Limpieza</option>
+                      <option value="Inspección">Inspección</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+
+                  {/* Priority Select */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Prioridad</label>
+                    <select
+                      value={newTicket.priority}
+                      onChange={(e) =>
+                        setNewTicket({ ...newTicket, priority: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                      required
+                    >
+                      <option value="Media">Media</option>
+                      <option value="Baja">Baja</option>
+                      <option value="Alta">Alta</option>
+                      <option value="Urgente">Urgente</option>
+                    </select>
+                  </div>
+
+                  {/* Description TextArea */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Descripción</label>
+                    <textarea
+                      value={newTicket.description}
+                      onChange={(e) =>
+                        setNewTicket({ ...newTicket, description: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 min-h-24"
+                      placeholder="Describe el problema o incidencia..."
+                      required
+                    />
+                  </div>
+
+                  {/* File Upload Input */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Adjuntar fotos/videos</label>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,video/*"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []);
+                        setTicketFiles(files);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {ticketFiles.length} archivo(s) seleccionado(s)
+                    </p>
+                  </div>
+
+                  {/* File Preview Grid */}
+                  {ticketFiles.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium mb-3">Vista previa</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        {ticketFiles.map((file, index) => (
+                          <div
+                            key={index}
+                            className="relative bg-gray-100 rounded-md overflow-hidden aspect-square"
+                          >
+                            {file.type.startsWith('image/') ? (
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={`Preview ${index}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                <FileText size={24} className="text-gray-400" />
+                              </div>
+                            )}
+                            <p className="absolute bottom-1 left-1 right-1 text-xs text-white bg-black bg-opacity-70 p-1 rounded truncate">
+                              {file.name}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Form Buttons */}
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      type="submit"
+                      disabled={!newTicket.propertyId || !newTicket.category || !newTicket.description}
+                      className="flex-1 bg-blue-600 text-white py-2 rounded-md font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      Crear Ticket
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTicketFiles([]);
+                        setNewTicket({
+                          propertyId: '',
+                          category: 'Plomería',
+                          priority: 'Media',
+                          description: '',
+                        });
+                      }}
+                      className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-md font-medium hover:bg-gray-400"
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </Card>
+        </div>
+      </main>
+    </div>
+  );
+}
