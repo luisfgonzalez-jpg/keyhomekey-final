@@ -193,6 +193,8 @@ export default function HomePage() {
   const [userRole, setUserRole] = useState<Role>(null);
   const [view, setView] = useState<'login' | 'dashboard'>('login');
   const [loading, setLoading] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [forceShowForm, setForceShowForm] = useState(false);
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -268,6 +270,16 @@ export default function HomePage() {
     return () => {
       subscription.unsubscribe();
     };
+  }, []);
+
+  // Debug: detect ?debug=1 in URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('debug') === '1') {
+        setShowDebug(true);
+      }
+    }
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -996,6 +1008,34 @@ Descripción: ${newTicket.description}${providerText}`,
         </div>
       </header>
 
+      {showDebug && (
+        <div className="bg-yellow-50 border-b-2 border-yellow-300 px-4 py-3">
+          <div className="max-w-6xl mx-auto">
+            <div className="bg-white p-4 rounded-lg border border-yellow-200">
+              <h4 className="font-semibold text-yellow-900 mb-2">🔍 Debug Panel</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm text-yellow-800 mb-3">
+                <div><strong>User Role:</strong> {userRole || 'null'}</div>
+                <div><strong>Properties Count:</strong> {properties.length}</div>
+                <div><strong>Session Email:</strong> {session?.user?.email || 'none'}</div>
+                <div><strong>Force Show Form:</strong> {forceShowForm ? 'YES' : 'NO'}</div>
+              </div>
+              <button
+                onClick={() => setForceShowForm(!forceShowForm)}
+                className="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-3 py-1 rounded text-xs font-semibold"
+              >
+                {forceShowForm ? 'Hide Form' : 'Force Show Form'}
+              </button>
+              <button
+                onClick={() => setShowDebug(false)}
+                className="ml-2 bg-gray-300 hover:bg-gray-400 text-gray-900 px-3 py-1 rounded text-xs"
+              >
+                Close Debug
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         {/* BLOQUE DE PROPIEDADES */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1022,7 +1062,7 @@ Descripción: ${newTicket.description}${providerText}`,
             </div>
 
             {/* Ticket Creation Form */}
-            {userRole === 'OWNER' && properties.length > 0 && (
+            {(forceShowForm || (userRole === 'OWNER' && properties.length > 0)) && (
               <div className="mt-8 border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4">Crear Ticket / Reportar Incidencia</h3>
                 <form
