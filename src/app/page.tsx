@@ -25,7 +25,7 @@ import {
   FileText,
 } from 'lucide-react';
 
-const KEYHOME_WHATSAPP = '573001234567'; // número general de KeyhomeKey
+const KEYHOME_WHATSAPP = '573103055424'; // número general de KeyhomeKey
 
 // -----------------------------------------------------------------------------
 // UI BÁSICA
@@ -159,16 +159,23 @@ interface Property {
   contract_end_date: string | null;
 }
 
-interface Ticket {
+interface Provider {
   id: string;
-  property_id: string;
-  category: string;
-  description: string;
-  priority: string;
-  provider_option: string | null;
-  reporter: string;
-  status: string;
-  created_at?: string;
+  user_id: string | null;
+  specialty: string;
+  department: string;
+  municipality: string;
+  is_active: boolean;
+  phone: string | null;
+}
+interface Provider {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  specialty: string;
+  department: string;
+  municipality: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -183,6 +190,8 @@ export default function HomePage() {
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [ticketFiles, setTicketFiles] = useState<File[]>([]);
+
 
   // AUTH
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -208,14 +217,151 @@ export default function HomePage() {
 
   const [availableCities, setAvailableCities] = useState<string[]>([]);
 
-  // FORM TICKET
-  const [newTicket, setNewTicket] = useState({
+   // FORM TICKET
+  type NewTicket = {
+    propertyId: string;
+    category: string;
+    description: string;
+    priority: string;
+  };
+
+  const [newTicket, setNewTicket] = useState<NewTicket>({
     propertyId: '',
     category: 'Plomería',
     description: '',
     priority: 'Media',
-    providerOption: 'KeyhomeKey',
   });
+
+  const createTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.user) return;
+
+    if (!newTicket.propertyId) {
+      alert('Selecciona un inmueble.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const property = properties.find((p) => p.id === newTicket.propertyId);
+
+      const { data, error } = await supabase
+        .from('tickets')
+        .insert([
+          {
+            property_id: newTicket.propertyId,
+            category: newTicket.category,
+            description: newTicket.description,
+            priority: newTicket.priority,
+            reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
+            status: 'Pendiente',
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTickets((prev) => [data as Ticket, ...prev]);
+      // 2) Subir archivos al bucket
+const mediaPaths: string[] = [];
+
+for (const file of ticketFiles) {
+  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  const path = `tickets/${data.id}/${Date.now()}-${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('tickets-media')
+    .upload(path, file);
+
+  if (uploadError) {
+    console.error('Error subiendo archivo', uploadError);
+    continue;
+  }
+
+  mediaPaths.push(path);
+}
+
+// 3) Actualizar ticket con media_urls
+if (mediaPaths.length > 0) {
+  const { error: updateError } = await supabase
+    .from('tickets')
+    .update({ media_urls: mediaPaths })
+    .eq('id', data.id);
+
+  if (updateError) {
+    console.error('Error actualizando media_urls', updateError);
+  }
+}
+      // -------------------------------
+      // Matching automático de proveedor
+      // -------------------------------
+      let whatsappNumber = KEYHOME_WHATSAPP; // por defecto, centro KeyhomeKey
+      let providerLabel = 'KeyhomeKey';
+
+      if (property) {
+        try {
+          const { data: providers } = await supabase
+            .from('providers')
+            .select('name, phone, specialty, department, municipality, is_active')
+            .eq('department', property.department)
+            .eq('municipality', property.municipality)
+            .eq('specialty', newTicket.category)
+            .eq('is_active', true)
+            .limit(1);
+
+          if (providers && providers.length > 0) {
+            const provider = providers[0] as any;
+            providerLabel = provider.name || 'Proveedor';
+
+            if (provider.phone) {
+              // Normalizamos el número: solo dígitos y agregamos 57 si hace falta
+              const digits = String(provider.phone).replace(/\D/g, '');
+              whatsappNumber = digits.startsWith('57')
+                ? digits
+                : `57${digits}`;
+            }
+          }
+        } catch (matchErr) {
+          console.error('Error buscando proveedores para el ticket:', matchErr);
+        }
+      }
+
+      // -------------------------------
+      // Abrir WhatsApp (proveedor o KeyhomeKey)
+      // -------------------------------
+      if (property && typeof window !== 'undefined') {
+        const text = encodeURIComponent(
+          `Nuevo ticket de ${
+            userRole === 'OWNER' ? 'propietario' : 'inquilino'
+          }.\n\n` +
+            `Inmueble: ${property.address} - ${property.municipality}, ${property.department}\n` +
+            `Categoría: ${newTicket.category}\n` +
+            `Prioridad: ${newTicket.priority}\n` +
+            `Descripción: ${newTicket.description}\n\n` +
+            `Asignado a: ${providerLabel}.`,
+        );
+
+        window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank');
+      }
+
+      // Resetear formulario
+      setNewTicket({
+        propertyId: '',
+        category: 'Plomería',
+        description: '',
+        priority: 'Media',
+      });
+
+      alert('Ticket creado correctamente.');
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error creando el ticket.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // INICIALIZACIÓN
@@ -255,30 +401,74 @@ export default function HomePage() {
   // ---------------------------------------------------------------------------
 
   const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      if (authMode === 'signup') {
-        // 1. Crear usuario en Auth
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
+  try {
+    if (authMode === 'signup') {
+      const normalizedEmail = email.trim().toLowerCase();
 
-        if (error) throw error;
+      // 0) Verificar si este email ya fue invitado como TENANT
+      const { data: invitedProfiles, error: invitedErr } = await supabase
+        .from('users_profiles')
+        .select('*')
+        .eq('email', normalizedEmail)
+        .limit(1);
 
-        const user = data.user;
-        if (!user) throw new Error('No se pudo obtener el usuario.');
+      if (invitedErr) {
+        console.error('Error verificando invitación de inquilino:', invitedErr);
+      }
 
-        // 2. Crear perfil en users_profiles como OWNER por defecto
+      const invitedProfile = invitedProfiles?.[0] ?? null;
+      const isInvitedTenant = invitedProfile?.role === 'TENANT';
+
+      // 1) Crear usuario en Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+      });
+
+      if (error) {
+        if (error.message?.includes('User already registered')) {
+          alert('Este correo ya tiene una cuenta. Por favor, inicia sesión.');
+          setAuthMode('signin');
+          return;
+        }
+        throw error;
+      }
+
+      const user = data.user;
+      if (!user) throw new Error('No se pudo obtener el usuario.');
+
+      // 2) Actualizar / crear perfil según sea TENANT invitado o OWNER nuevo
+      if (isInvitedTenant && invitedProfile) {
+        // TENANT invitado: vinculamos su user_id
+        const { error: updateErr } = await supabase
+          .from('users_profiles')
+          .update({
+            user_id: user.id,
+            name: name.trim(),
+            phone: phone.trim(),
+          })
+          .eq('id', invitedProfile.id);
+
+        if (updateErr) {
+          console.error('Error actualizando perfil de inquilino:', updateErr);
+          alert(
+            'La cuenta se creó, pero hubo un problema vinculando tu perfil de inquilino. Escríbenos a soporte.',
+          );
+        } else {
+          alert('Cuenta de inquilino creada con éxito. Ahora puedes iniciar sesión.');
+        }
+      } else {
+        // OWNER normal: creamos perfil nuevo con rol OWNER
         const { error: profileError } = await supabase
           .from('users_profiles')
           .insert([
             {
               user_id: user.id,
               name: name.trim(),
-              email: email.trim(),
+              email: normalizedEmail,
               phone: phone.trim(),
               role: 'OWNER',
             },
@@ -293,30 +483,33 @@ export default function HomePage() {
         }
 
         alert('Usuario registrado con éxito.');
-
-        // Volvemos al modo login
-        setAuthMode('signin');
-        setPassword('');
-      } else {
-        // LOGIN
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-        if (!data.session) throw new Error('No se pudo iniciar sesión.');
-
-        setSession(data.session);
-        await detectRoleAndLoad(data.session.user);
       }
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || 'Error de autenticación.');
-    } finally {
-      setLoading(false);
+
+      // Volvemos al modo login
+      setAuthMode('signin');
+      setPassword('');
+    } else {
+      // LOGIN
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      if (!data.session) throw new Error('No se pudo iniciar sesión.');
+
+      setSession(data.session);
+      await detectRoleAndLoad(data.session.user);
     }
-  };
+  } catch (err: any) {
+    console.error(err);
+    alert(err.message || 'Error de autenticación.');
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   const detectRoleAndLoad = async (user: SupabaseUser | null) => {
     try {
@@ -462,143 +655,287 @@ export default function HomePage() {
     setAvailableCities(found ? found.ciudades : []);
   };
 
-  const addProperty = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!session?.user) return;
+ const addProperty = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!session?.user) return;
 
+  setLoading(true);
+
+  try {
+    const user = session.user;
+
+    // 1) Asegurar que exista perfil para este owner (para la foreign key)
     try {
-      setLoading(true);
+      const { data: profiles, error: profileErr } = await supabase
+        .from('users_profiles')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .limit(1);
 
-      const { data, error } = await supabase
-        .from('properties')
-        .insert([
-          {
-            owner_id: session.user.id,
-            address: newProp.address,
-            type: newProp.type,
-            department: newProp.department,
-            municipality: newProp.municipality,
-            owner_phone: newProp.ownerPhone,
-            is_rented: newProp.isRented,
-            tenant_name: newProp.isRented ? newProp.tenantName : null,
-            tenant_email: newProp.isRented ? newProp.tenantEmail : null,
-            tenant_phone: newProp.isRented ? newProp.tenantPhone : null,
-            contract_start_date: newProp.contractStart || null,
-            contract_end_date: newProp.contractEnd || null,
-          },
-        ])
-        .select()
-        .single();
+      console.log('profiles check:', { profiles, profileErr });
 
-      if (error) throw error;
+      if (profileErr) {
+        console.error('Error verificando perfil del propietario:', profileErr);
+      } else if (!profiles || profiles.length === 0) {
+        const guessedName = user.email?.split('@')[0] || 'Usuario KeyhomeKey';
 
-      // actualizar lista en pantalla
-      setProperties((prev) => [data as Property, ...prev]);
+        const { error: insertProfileErr } = await supabase
+          .from('users_profiles')
+          .insert([
+            {
+              user_id: user.id,
+              name: guessedName,
+              email: user.email,
+              phone: '',
+              role: 'OWNER',
+            },
+          ]);
 
-      // si hay inquilino, enviar invitación por email
-      if (newProp.isRented && newProp.tenantEmail) {
-        try {
-          await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: newProp.tenantEmail,
-              propertyAddress: newProp.address,
-            }),
-          });
-        } catch (err) {
-          console.error('Error enviando email de invitación:', err);
+        console.log('insertProfileErr:', insertProfileErr);
+
+        if (insertProfileErr) {
+          console.error(
+            'Error creando perfil automático del propietario:',
+            insertProfileErr,
+          );
+          alert(
+            'No se pudo crear el perfil del propietario en KeyhomeKey. Intenta de nuevo o contáctanos.',
+          );
+          return;
         }
       }
-
-      // resetear formulario
-      setNewProp({
-        address: '',
-        type: 'Apartamento',
-        department: '',
-        municipality: '',
-        ownerPhone: '',
-        isRented: false,
-        tenantName: '',
-        tenantEmail: '',
-        tenantPhone: '',
-        contractStart: '',
-        contractEnd: '',
-      });
-      setAvailableCities([]);
-
-      alert('Inmueble guardado correctamente.');
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || 'Error guardando el inmueble.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createTicket = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!session?.user) return;
-    if (!newTicket.propertyId) {
-      alert('Selecciona un inmueble.');
+    } catch (err) {
+      console.error('Error asegurando perfil del propietario:', err);
+      alert(
+        'Ocurrió un problema verificando tu perfil de propietario. Intenta de nuevo.',
+      );
       return;
     }
 
-    try {
-      setLoading(true);
+    // 2) Ahora sí, crear la propiedad
+    const { data, error } = await supabase
+      .from('properties')
+      .insert([
+        {
+          owner_id: user.id,
+          address: newProp.address,
+          type: newProp.type,
+          department: newProp.department,
+          municipality: newProp.municipality,
+          owner_phone: newProp.ownerPhone,
+          is_rented: newProp.isRented,
+          tenant_name: newProp.isRented ? newProp.tenantName : null,
+          tenant_email: newProp.isRented ? newProp.tenantEmail : null,
+          tenant_phone: newProp.isRented ? newProp.tenantPhone : null,
+          contract_start_date: newProp.contractStart || null,
+          contract_end_date: newProp.contractEnd || null,
+        },
+      ])
+      .select()
+      .single();
 
-      const property = properties.find((p) => p.id === newTicket.propertyId);
-
-      const { data, error } = await supabase
-        .from('tickets')
-        .insert([
-          {
-            property_id: newTicket.propertyId,
-            category: newTicket.category,
-            description: newTicket.description,
-            priority: newTicket.priority,
-            provider_option: newTicket.providerOption,
-            reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
-            status: 'Pendiente',
-          },
-        ])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setTickets((prev) => [data as Ticket, ...prev]);
-
-      // Abrir WhatsApp para contactar a KeyhomeKey (o luego al proveedor)
-      if (property && typeof window !== 'undefined') {
-        const text = encodeURIComponent(
-          `Nuevo ticket de ${
-            userRole === 'OWNER' ? 'propietario' : 'inquilino'
-          }.\n\nInmueble: ${property.address} - ${property.municipality}, ${
-            property.department
-          }\nCategoría: ${newTicket.category}\nPrioridad: ${
-            newTicket.priority
-          }\nDescripción: ${newTicket.description}`,
-        );
-        window.open(`https://wa.me/${KEYHOME_WHATSAPP}?text=${text}`, '_blank');
-      }
-
-      setNewTicket({
-        propertyId: '',
-        category: 'Plomería',
-        description: '',
-        priority: 'Media',
-        providerOption: 'KeyhomeKey',
-      });
-
-      alert('Ticket creado correctamente.');
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || 'Error creando el ticket.');
-    } finally {
-      setLoading(false);
+    if (error) {
+      console.error('Error insertando propiedad:', error);
+      alert(
+        error.message ||
+          'Ocurrió un problema guardando el inmueble en KeyhomeKey.',
+      );
+      throw error;
     }
-  };
+
+    const insertedProperty = data as Property;
+
+    // 3) Si el inmueble está arrendado, crear perfil TENANT si no existe
+    if (newProp.isRented && newProp.tenantEmail) {
+      const tenantEmail = newProp.tenantEmail.trim().toLowerCase();
+
+      try {
+        // Verificar si ya existe
+        const { data: existingTenant } = await supabase
+          .from('users_profiles')
+          .select('id')
+          .eq('email', tenantEmail)
+          .limit(1);
+
+        // Crear si no existe
+        if (!existingTenant || existingTenant.length === 0) {
+          const guessedName =
+            newProp.tenantName?.trim() || tenantEmail.split('@')[0];
+
+          const { error: tenantInsertError } = await supabase
+            .from('users_profiles')
+            .insert([
+              {
+                user_id: null,
+                name: guessedName,
+                email: tenantEmail,
+                phone: newProp.tenantPhone?.trim() || '',
+                role: 'TENANT',
+              },
+            ]);
+
+          if (tenantInsertError) {
+            console.error(
+              'Error creando perfil del inquilino:',
+              tenantInsertError,
+            );
+          }
+        }
+      } catch (err) {
+        console.error('Error procesando perfil del inquilino:', err);
+      }
+    }
+
+    // 4) Actualizar lista en pantalla
+    setProperties((prev) => [insertedProperty, ...prev]);
+
+    // 5) Si hay inquilino, enviar invitación por email (como antes)
+    if (newProp.isRented && newProp.tenantEmail) {
+      try {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: newProp.tenantEmail,
+            propertyAddress: newProp.address,
+          }),
+        });
+      } catch (err) {
+        console.error('Error enviando email de invitación:', err);
+      }
+    }
+
+    // 6) Resetear formulario
+    setNewProp({
+      address: '',
+      type: 'Apartamento',
+      department: '',
+      municipality: '',
+      ownerPhone: '',
+      isRented: false,
+      tenantName: '',
+      tenantEmail: '',
+      tenantPhone: '',
+      contractStart: '',
+      contractEnd: '',
+    });
+    setAvailableCities([]);
+
+    alert('Inmueble guardado correctamente.');
+  } catch (err: any) {
+    console.error(err);
+    alert(err.message || 'Error guardando el inmueble.');
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+ const createTicket = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!session?.user) return;
+
+  if (!newTicket.propertyId) {
+    alert('Selecciona un inmueble.');
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const property = properties.find((p) => p.id === newTicket.propertyId);
+    if (!property) {
+      alert('No encontramos el inmueble seleccionado.');
+      return;
+    }
+
+    // 1) Intentar encontrar un proveedor compatible
+    let assignedProvider: any = null;
+
+    try {
+      const { data: providers, error: providersError } = await supabase
+        .from('providers')
+        .select('*')
+        .eq('department', property.department)
+        .eq('municipality', property.municipality)
+        .limit(1);
+
+      if (providersError) {
+        console.error('Error buscando proveedores:', providersError);
+      } else if (providers && providers.length > 0) {
+        assignedProvider = providers[0];
+      }
+    } catch (provErr) {
+      console.error('Error en matching de proveedor:', provErr);
+    }
+
+    // 2) Crear el ticket
+    const { data, error } = await supabase
+  .from('tickets')
+  .insert([
+    {
+      property_id: newTicket.propertyId,
+      // 👇 Nuevo: título del ticket
+      title: `Ticket de ${newTicket.category}`,
+      category: newTicket.category,
+      description: newTicket.description,
+      priority: newTicket.priority,
+      reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
+      // 👇 Nuevo: quién lo reporta (email del usuario logueado)
+      reported_by_email: session.user.email ?? '',
+      status: 'Pendiente',
+    },
+  ])
+  .select()
+  .single();
+
+
+    if (error) throw error;
+
+    setTickets((prev) => [data as Ticket, ...prev]);
+
+    // 3) Mensaje de WhatsApp
+    if (property && typeof window !== 'undefined') {
+      const providerText = assignedProvider
+        ? `\n\nProveedor sugerido:\n- Nombre: ${
+            assignedProvider.name || 'Sin nombre'
+          }\n- Teléfono: ${
+            assignedProvider.phone || 'Sin teléfono'
+          }\n- Ciudad: ${assignedProvider.municipality || ''}, ${
+            assignedProvider.department || ''
+          }`
+        : '\n\nAún no hay proveedor asociado. KeyhomeKey asignará uno.';
+
+      const text = encodeURIComponent(
+        `Nuevo ticket de ${
+          userRole === 'OWNER' ? 'propietario' : 'inquilino'
+        }.\n\nInmueble: ${property.address} - ${property.municipality}, ${
+          property.department
+        }\nCategoría: ${newTicket.category}\nPrioridad: ${
+          newTicket.priority
+        }\nDescripción: ${newTicket.description}${providerText}`,
+      );
+
+      window.open(`https://wa.me/${KEYHOME_WHATSAPP}?text=${text}`, '_blank');
+    }
+
+    // 4) Resetear formulario
+    setNewTicket({
+      propertyId: '',
+      category: 'Plomería',
+      description: '',
+      priority: 'Media',
+      providerOption: 'KeyhomeKey',
+    });
+
+    alert('Ticket creado correctamente.');
+  } catch (err: any) {
+    console.error(err);
+    alert(err.message || 'Error creando el ticket.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ---------------------------------------------------------------------------
   // VISTAS
@@ -920,6 +1257,43 @@ export default function HomePage() {
                   }
                 />
               </div>
+              <div className="mt-4">
+  <label className="block text-[11px] text-slate-500 mb-1">
+    Fotos / videos del problema
+  </label>
+
+  <input
+    type="file"
+    multiple
+    accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
+    onChange={(e) => {
+      const files = Array.from(e.target.files ?? []);
+      setTicketFiles((prev) => [...prev, ...files]);
+    }}
+  />
+
+  <div className="mt-2 flex flex-wrap gap-2">
+    {ticketFiles.map((file, index) => (
+      <div
+        key={index}
+        className="border rounded px-2 py-1 text-[11px] bg-slate-50"
+      >
+        <div className="truncate max-w-[140px]">{file.name}</div>
+        <button
+          type="button"
+          className="text-red-500 mt-1"
+          onClick={() =>
+            setTicketFiles((prev) =>
+              prev.filter((_, i) => i !== index)
+            )
+          }
+        >
+          Quitar
+        </button>
+      </div>
+    ))}
+  </div>
+</div>
 
               <Button
                 disabled={loading}
@@ -1100,7 +1474,7 @@ export default function HomePage() {
                     icon={Phone}
                     type="tel"
                     required
-                    placeholder="3001234567"
+                    placeholder="3103055424"
                     value={newProp.ownerPhone}
                     onChange={(e: any) =>
                       setNewProp((prev) => ({
