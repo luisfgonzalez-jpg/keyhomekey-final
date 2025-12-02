@@ -111,7 +111,7 @@ const TextArea = ({ icon: Icon, ...props }: any) => (
     </div>
     <textarea
       {...props}
-      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none transition-all min-h-[90px] resize-vertical"
+      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none transition-all min-h-[90px] resize-y"
     />
   </div>
 );
@@ -161,21 +161,27 @@ interface Property {
 
 interface Provider {
   id: string;
-  user_id: string | null;
-  specialty: string;
-  department: string;
-  municipality: string;
-  is_active: boolean;
-  phone: string | null;
-}
-interface Provider {
-  id: string;
   name: string;
-  email: string;
-  phone: string;
+  email?: string | null;
+  phone?: string | null;
   specialty: string;
   department: string;
   municipality: string;
+  is_active?: boolean;
+}
+
+interface Ticket {
+  id: string;
+  property_id: string;
+  title?: string | null;
+  category: string;
+  description: string;
+  priority: string;
+  reporter: string;
+  reported_by_email?: string | null;
+  status: string;
+  media_urls?: string[] | null;
+  created_at?: string | null;
 }
 
 // -----------------------------------------------------------------------------
@@ -191,7 +197,6 @@ export default function HomePage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketFiles, setTicketFiles] = useState<File[]>([]);
-
 
   // AUTH
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -232,129 +237,6 @@ export default function HomePage() {
     priority: 'Media',
   });
 
-  
-    try {
-      setLoading(true);
-
-      const property = properties.find((p) => p.id === newTicket.propertyId);
-
-      const { data, error } = await supabase
-        .from('tickets')
-        .insert([
-          {
-            property_id: newTicket.propertyId,
-            category: newTicket.category,
-            description: newTicket.description,
-            priority: newTicket.priority,
-            reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
-            status: 'Pendiente',
-          },
-        ])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setTickets((prev) => [data as Ticket, ...prev]);
-      // 2) Subir archivos al bucket
-const mediaPaths: string[] = [];
-
-for (const file of ticketFiles) {
-  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-  const path = `tickets/${data.id}/${Date.now()}-${safeName}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from('tickets-media')
-    .upload(path, file);
-
-  if (uploadError) {
-    console.error('Error subiendo archivo', uploadError);
-    continue;
-  }
-
-  mediaPaths.push(path);
-}
-
-// 3) Actualizar ticket con media_urls
-if (mediaPaths.length > 0) {
-  const { error: updateError } = await supabase
-    .from('tickets')
-    .update({ media_urls: mediaPaths })
-    .eq('id', data.id);
-
-  if (updateError) {
-    console.error('Error actualizando media_urls', updateError);
-  }
-}
-      // -------------------------------
-      // Matching automático de proveedor
-      // -------------------------------
-      let whatsappNumber = KEYHOME_WHATSAPP; // por defecto, centro KeyhomeKey
-      let providerLabel = 'KeyhomeKey';
-
-      if (property) {
-        try {
-          const { data: providers } = await supabase
-            .from('providers')
-            .select('name, phone, specialty, department, municipality, is_active')
-            .eq('department', property.department)
-            .eq('municipality', property.municipality)
-            .eq('specialty', newTicket.category)
-            .eq('is_active', true)
-            .limit(1);
-
-          if (providers && providers.length > 0) {
-            const provider = providers[0] as any;
-            providerLabel = provider.name || 'Proveedor';
-
-            if (provider.phone) {
-              // Normalizamos el número: solo dígitos y agregamos 57 si hace falta
-              const digits = String(provider.phone).replace(/\D/g, '');
-              whatsappNumber = digits.startsWith('57')
-                ? digits
-                : `57${digits}`;
-            }
-          }
-        } catch (matchErr) {
-          console.error('Error buscando proveedores para el ticket:', matchErr);
-        }
-      }
-
-      // -------------------------------
-      // Abrir WhatsApp (proveedor o KeyhomeKey)
-      // -------------------------------
-      if (property && typeof window !== 'undefined') {
-        const text = encodeURIComponent(
-          `Nuevo ticket de ${
-            userRole === 'OWNER' ? 'propietario' : 'inquilino'
-          }.\n\n` +
-            `Inmueble: ${property.address} - ${property.municipality}, ${property.department}\n` +
-            `Categoría: ${newTicket.category}\n` +
-            `Prioridad: ${newTicket.priority}\n` +
-            `Descripción: ${newTicket.description}\n\n` +
-            `Asignado a: ${providerLabel}.`,
-        );
-
-        window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank');
-      }
-
-      // Resetear formulario
-      setNewTicket({
-        propertyId: '',
-        category: 'Plomería',
-        description: '',
-        priority: 'Media',
-      });
-
-      alert('Ticket creado correctamente.');
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || 'Error creando el ticket.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // ---------------------------------------------------------------------------
   // INICIALIZACIÓN
   // ---------------------------------------------------------------------------
@@ -393,115 +275,113 @@ if (mediaPaths.length > 0) {
   // ---------------------------------------------------------------------------
 
   const handleAuth = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    if (authMode === 'signup') {
-      const normalizedEmail = email.trim().toLowerCase();
+    try {
+      if (authMode === 'signup') {
+        const normalizedEmail = email.trim().toLowerCase();
 
-      // 0) Verificar si este email ya fue invitado como TENANT
-      const { data: invitedProfiles, error: invitedErr } = await supabase
-        .from('users_profiles')
-        .select('*')
-        .eq('email', normalizedEmail)
-        .limit(1);
-
-      if (invitedErr) {
-        console.error('Error verificando invitación de inquilino:', invitedErr);
-      }
-
-      const invitedProfile = invitedProfiles?.[0] ?? null;
-      const isInvitedTenant = invitedProfile?.role === 'TENANT';
-
-      // 1) Crear usuario en Auth
-      const { data, error } = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password,
-      });
-
-      if (error) {
-        if (error.message?.includes('User already registered')) {
-          alert('Este correo ya tiene una cuenta. Por favor, inicia sesión.');
-          setAuthMode('signin');
-          return;
-        }
-        throw error;
-      }
-
-      const user = data.user;
-      if (!user) throw new Error('No se pudo obtener el usuario.');
-
-      // 2) Actualizar / crear perfil según sea TENANT invitado o OWNER nuevo
-      if (isInvitedTenant && invitedProfile) {
-        // TENANT invitado: vinculamos su user_id
-        const { error: updateErr } = await supabase
+        // 0) Verificar si este email ya fue invitado como TENANT
+        const { data: invitedProfiles, error: invitedErr } = await supabase
           .from('users_profiles')
-          .update({
-            user_id: user.id,
-            name: name.trim(),
-            phone: phone.trim(),
-          })
-          .eq('id', invitedProfile.id);
+          .select('*')
+          .eq('email', normalizedEmail)
+          .limit(1);
 
-        if (updateErr) {
-          console.error('Error actualizando perfil de inquilino:', updateErr);
-          alert(
-            'La cuenta se creó, pero hubo un problema vinculando tu perfil de inquilino. Escríbenos a soporte.',
-          );
-        } else {
-          alert('Cuenta de inquilino creada con éxito. Ahora puedes iniciar sesión.');
+        if (invitedErr) {
+          console.error('Error verificando invitación de inquilino:', invitedErr);
         }
-      } else {
-        // OWNER normal: creamos perfil nuevo con rol OWNER
-        const { error: profileError } = await supabase
-          .from('users_profiles')
-          .insert([
-            {
+
+        const invitedProfile = invitedProfiles?.[0] ?? null;
+        const isInvitedTenant = invitedProfile?.role === 'TENANT';
+
+        // 1) Crear usuario en Auth
+        const { data, error } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+        });
+
+        if (error) {
+          if (error.message?.includes('User already registered')) {
+            alert('Este correo ya tiene una cuenta. Por favor, inicia sesión.');
+            setAuthMode('signin');
+            return;
+          }
+          throw error;
+        }
+
+        const user = data.user;
+        if (!user) throw new Error('No se pudo obtener el usuario.');
+
+        // 2) Actualizar / crear perfil según sea TENANT invitado o OWNER nuevo
+        if (isInvitedTenant && invitedProfile) {
+          // TENANT invitado: vinculamos su user_id
+          const { error: updateErr } = await supabase
+            .from('users_profiles')
+            .update({
               user_id: user.id,
               name: name.trim(),
-              email: normalizedEmail,
               phone: phone.trim(),
-              role: 'OWNER',
-            },
-          ]);
+            })
+            .eq('id', invitedProfile.id);
 
-        if (profileError) {
-          console.error(profileError);
-          alert(
-            'La cuenta se creó, pero hubo un problema guardando el perfil en KeyhomeKey.',
-          );
-          return;
+          if (updateErr) {
+            console.error('Error actualizando perfil de inquilino:', updateErr);
+            alert(
+              'La cuenta se creó, pero hubo un problema vinculando tu perfil de inquilino. Escríbenos a soporte.',
+            );
+          } else {
+            alert('Cuenta de inquilino creada con éxito. Ahora puedes iniciar sesión.');
+          }
+        } else {
+          // OWNER normal: creamos perfil nuevo con rol OWNER
+          const { error: profileError } = await supabase
+            .from('users_profiles')
+            .insert([
+              {
+                user_id: user.id,
+                name: name.trim(),
+                email: normalizedEmail,
+                phone: phone.trim(),
+                role: 'OWNER',
+              },
+            ]);
+
+          if (profileError) {
+            console.error(profileError);
+            alert(
+              'La cuenta se creó, pero hubo un problema guardando el perfil en KeyhomeKey.',
+            );
+            return;
+          }
+
+          alert('Usuario registrado con éxito.');
         }
 
-        alert('Usuario registrado con éxito.');
+        // Volvemos al modo login
+        setAuthMode('signin');
+        setPassword('');
+      } else {
+        // LOGIN
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+        if (!data.session) throw new Error('No se pudo iniciar sesión.');
+
+        setSession(data.session);
+        await detectRoleAndLoad(data.session.user);
       }
-
-      // Volvemos al modo login
-      setAuthMode('signin');
-      setPassword('');
-    } else {
-      // LOGIN
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-      if (!data.session) throw new Error('No se pudo iniciar sesión.');
-
-      setSession(data.session);
-      await detectRoleAndLoad(data.session.user);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error de autenticación.');
+    } finally {
+      setLoading(false);
     }
-  } catch (err: any) {
-    console.error(err);
-    alert(err.message || 'Error de autenticación.');
-  } finally {
-    setLoading(false);
-  }
-};
-
-
+  };
 
   const detectRoleAndLoad = async (user: SupabaseUser | null) => {
     try {
@@ -513,6 +393,8 @@ if (mediaPaths.length > 0) {
         .select('*')
         .eq('user_id', user.id)
         .single();
+
+      
 
       let role: Role = null;
 
@@ -822,7 +704,6 @@ if (mediaPaths.length > 0) {
   }
 };
 
-
  const createTicket = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!session?.user) return;
@@ -882,75 +763,93 @@ if (mediaPaths.length > 0) {
   .single();
 
     if (error) throw error;
+
     // 3) Subir archivos al bucket
-const mediaPaths: string[] = [];
+    const mediaPaths: string[] = [];
 
-for (const file of ticketFiles) {
-  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-  const path = `tickets/${data.id}/${Date.now()}-${safeName}`;
+    for (const file of ticketFiles) {
+      try {
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\-]/g, '_');
+        const path = `tickets/${data.id}/${Date.now()}-${safeName}`;
 
-  const { error: uploadError } = await supabase
-    .from('tickets-media')
-    .upload(path, file);
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('tickets-media')
+          .upload(path, file, { contentType: file.type, upsert: false });
 
-  if (uploadError) {
-    console.error('Error subiendo archivo', uploadError);
-    continue;
-  }
+        if (uploadError) {
+          console.error('Error subiendo archivo', uploadError);
+          continue;
+        }
 
-  mediaPaths.push(path);
-}
+        mediaPaths.push(path);
+      } catch (uploadCatchErr) {
+        console.error('Excepción subiendo archivo:', uploadCatchErr);
+      }
+    }
 
-// 4) Actualizar ticket con media_urls
-if (mediaPaths.length > 0) {
-  const { error: updateError } = await supabase
-    .from('tickets')
-    .update({ media_urls: mediaPaths })
-    .eq('id', data.id);
+    // 4) Actualizar ticket con media_urls
+    if (mediaPaths.length > 0) {
+      const { error: updateError } = await supabase
+        .from('tickets')
+        .update({ media_urls: mediaPaths })
+        .eq('id', data.id);
 
-  if (updateError) {
-    console.error('Error actualizando media_urls', updateError);
-  } else {
-    (data as any).media_urls = mediaPaths;
-  }
-}
-
+      if (updateError) {
+        console.error('Error actualizando media_urls', updateError);
+      } else {
+        (data as any).media_urls = mediaPaths;
+      }
+    }
 
     setTickets((prev) => [data as Ticket, ...prev]);
 
-    // 3) Mensaje de WhatsApp
+    // 5) Mensaje de WhatsApp
     if (property && typeof window !== 'undefined') {
       const providerText = assignedProvider
-        ? `\n\nProveedor sugerido:\n- Nombre: ${
+        ? `
+
+Proveedor sugerido:
+- Nombre: ${
             assignedProvider.name || 'Sin nombre'
-          }\n- Teléfono: ${
+          }
+- Teléfono: ${
             assignedProvider.phone || 'Sin teléfono'
-          }\n- Ciudad: ${assignedProvider.municipality || ''}, ${
+          }
+- Ciudad: ${assignedProvider.municipality || ''}, ${
             assignedProvider.department || ''
           }`
-        : '\n\nAún no hay proveedor asociado. KeyhomeKey asignará uno.';
+        : '
+
+Aún no hay proveedor asociado. KeyhomeKey asignará uno.';
 
       const text = encodeURIComponent(
         `Nuevo ticket de ${
           userRole === 'OWNER' ? 'propietario' : 'inquilino'
-        }.\n\nInmueble: ${property.address} - ${property.municipality}, ${
+        }.
+
+Inmueble: ${property.address} - ${property.municipality}, ${
           property.department
-        }\nCategoría: ${newTicket.category}\nPrioridad: ${
+        }
+Categoría: ${newTicket.category}
+Prioridad: ${
           newTicket.priority
-        }\nDescripción: ${newTicket.description}${providerText}`,
+        }
+Descripción: ${newTicket.description}${providerText}`,
       );
 
       window.open(`https://wa.me/${KEYHOME_WHATSAPP}?text=${text}`, '_blank');
     }
 
-    // 4) Resetear formulario
+    // 6) Resetear formulario
     setNewTicket({
       propertyId: '',
       category: 'Plomería',
       description: '',
       priority: 'Media',
-      providerOption: 'KeyhomeKey',
     });
+
+    // Limpiar archivos seleccionados
+    setTicketFiles([]);
 
     alert('Ticket creado correctamente.');
   } catch (err: any) {
@@ -1009,7 +908,7 @@ if (mediaPaths.length > 0) {
 
           <form onSubmit={handleAuth} className="space-y-4">
             {authMode === 'signup' && (
-              <>
+              <>     
                 <Input
                   icon={UserIcon}
                   type="text"
@@ -1048,10 +947,10 @@ if (mediaPaths.length > 0) {
 
             <Button disabled={loading} type="submit" className="w-full mt-2">
               {loading
-                ? 'Procesando...'
-                : authMode === 'signin'
-                ? 'Entrar'
-                : 'Crear cuenta'}
+? 'Procesando...'
+: authMode === 'signin'
+? 'Entrar'
+: 'Crear cuenta'}
             </Button>
           </form>
 
@@ -1121,523 +1020,3 @@ if (mediaPaths.length > 0) {
                 </Button>
               )}
             </div>
-
-            {properties.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                Aún no hay inmuebles registrados.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {properties.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-start justify-between border border-slate-100 rounded-xl px-4 py-3 bg-slate-50"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        {p.address}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {p.municipality}, {p.department} · {p.type}
-                      </p>
-                      {p.is_rented && p.tenant_name && (
-                        <p className="text-[11px] text-slate-500 mt-1">
-                          Inquilino: {p.tenant_name} ({p.tenant_email})
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-[11px] text-slate-500">
-                        Tel: {p.owner_phone}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-                        <UserCheck size={12} />
-                        {p.is_rented ? 'Arrendado' : 'Disponible'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          {/* TUS ESTADÍSTICAS SENCILLAS */}
-          <Card className="p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <FileText size={16} />
-              Resumen
-            </h3>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
-                <p className="text-[11px] text-slate-500 mb-1">
-                  Inmuebles activos
-                </p>
-                <p className="text-lg font-semibold text-slate-900">
-                  {properties.length}
-                </p>
-              </div>
-              <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
-                <p className="text-[11px] text-slate-500 mb-1">
-                  Tickets abiertos
-                </p>
-                <p className="text-lg font-semibold text-slate-900">
-                  {tickets.filter((t) => t.status !== 'Resuelto').length}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* FORMULARIO NUEVO TICKET */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="p-5">
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
-              <Wrench size={16} />
-              Reportar falla (ticket)
-            </h3>
-
-            <form onSubmit={createTicket} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-[11px] text-slate-500 mb-1">
-                  Inmueble
-                </label>
-                <select
-                  required
-                  value={newTicket.propertyId}
-                  onChange={(e) =>
-                    setNewTicket((prev) => ({
-                      ...prev,
-                      propertyId: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-                >
-                  <option value="">Selecciona un inmueble</option>
-                  {properties.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.address} – {p.municipality}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">
-                    Categoría
-                  </label>
-                  <select
-                    value={newTicket.category}
-                    onChange={(e) =>
-                      setNewTicket((prev) => ({
-                        ...prev,
-                        category: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-                  >
-                    <option>Plomería</option>
-                    <option>Eléctrico</option>
-                    <option>Electrodomésticos</option>
-                    <option>Cerrajería</option>
-                    <option>Otros</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">
-                    Prioridad
-                  </label>
-                  <select
-                    value={newTicket.priority}
-                    onChange={(e) =>
-                      setNewTicket((prev) => ({
-                        ...prev,
-                        priority: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-                  >
-                    <option>Alta</option>
-                    <option>Media</option>
-                    <option>Baja</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-slate-500 mb-1">
-                  Descripción de la falla
-                </label>
-                <TextArea
-                  icon={MessageCircle}
-                  required
-                  placeholder="Describe qué está pasando, por ejemplo: fuga en el lavamanos del baño principal."
-                  value={newTicket.description}
-                  onChange={(e: any) =>
-                    setNewTicket((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="mt-4">
-  <label className="block text-[11px] text-slate-500 mb-1">
-    Fotos / videos del problema
-  </label>
-
-  <input
-    type="file"
-    multiple
-    accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
-    onChange={(e) => {
-      const files = Array.from(e.target.files ?? []);
-      setTicketFiles((prev) => [...prev, ...files]);
-    }}
-  />
-
-  <div className="mt-2 flex flex-wrap gap-2">
-    {ticketFiles.map((file, index) => (
-      <div
-        key={index}
-        className="border rounded px-2 py-1 text-[11px] bg-slate-50"
-      >
-        <div className="truncate max-w-[140px]">{file.name}</div>
-        <button
-          type="button"
-          className="text-red-500 mt-1"
-          onClick={() =>
-            setTicketFiles((prev) =>
-              prev.filter((_, i) => i !== index)
-            )
-          }
-        >
-          Quitar
-        </button>
-      </div>
-    ))}
-  </div>
-</div>
-
-              <Button
-                disabled={loading}
-                type="submit"
-                className="w-full mt-2 gap-2"
-              >
-                {loading ? (
-                  'Creando ticket...'
-                ) : (
-                  <>
-                    <Send size={16} />
-                    Crear ticket y notificar
-                  </>
-                )}
-              </Button>
-
-              <p className="text-[11px] text-slate-400 mt-2">
-                Se enviará una notificación por WhatsApp al centro de KeyhomeKey
-                y luego al proveedor adecuado según la ubicación y el tipo de
-                falla.
-              </p>
-            </form>
-          </Card>
-
-          {/* LISTA DE TICKETS */}
-          <Card className="p-5">
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
-              <Calendar size={16} />
-              Tickets recientes
-            </h3>
-            {tickets.length === 0 ? (
-              <p className="text-xs text-slate-500">
-                Aún no hay tickets registrados.
-              </p>
-            ) : (
-              <div className="space-y-3 max-h-[320px] overflow-auto pr-1">
-                {tickets.map((t) => {
-                  const prop = properties.find((p) => p.id === t.property_id);
-                  return (
-                    <div
-                      key={t.id}
-                      className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50 text-xs flex justify-between gap-2"
-                    >
-                      <div>
-                        <p className="font-semibold text-slate-900 flex items-center gap-1">
-                          <Wrench size={13} />
-                          {t.category} ·{' '}
-                          <span className="font-normal text-slate-600">
-                            {t.priority}
-                          </span>
-                        </p>
-                        <p className="text-[11px] text-slate-500 line-clamp-2">
-                          {t.description}
-                        </p>
-                        {prop && (
-                          <p className="text-[11px] text-slate-400 mt-1">
-                            {prop.address} – {prop.municipality}
-                          </p>
-                        )}
-                        <p className="text-[11px] text-slate-400 mt-1">
-                          Reportado por: {t.reporter}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <StatusBadge status={t.status} />
-                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
-                          <Truck size={11} />
-                          Flujo KeyhomeKey
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-        </div>
-
-        {/* FORMULARIO NUEVO INMUEBLE (solo propietario) */}
-        {userRole === 'OWNER' && (
-          <Card id="add-property" className="p-5">
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
-              <Plus size={16} />
-              Registrar nuevo inmueble
-            </h3>
-
-            <form onSubmit={addProperty} className="space-y-3 text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">
-                    Dirección
-                  </label>
-                  <Input
-                    icon={MapPin}
-                    type="text"
-                    required
-                    placeholder="Calle 123 #45-67 Apto 302"
-                    value={newProp.address}
-                    onChange={(e: any) =>
-                      setNewProp((prev) => ({
-                        ...prev,
-                        address: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">
-                    Tipo de inmueble
-                  </label>
-                  <select
-                    value={newProp.type}
-                    onChange={(e) =>
-                      setNewProp((prev) => ({
-                        ...prev,
-                        type: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-                  >
-                    <option>Apartamento</option>
-                    <option>Casa</option>
-                    <option>Local</option>
-                    <option>Bodega</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">
-                    Departamento
-                  </label>
-                  <select
-                    required
-                    value={newProp.department}
-                    onChange={(e) => handleDepartmentChange(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-                  >
-                    <option value="">Selecciona un departamento</option>
-                    {colombiaLocations.map((d) => (
-                      <option key={d.departamento} value={d.departamento}>
-                        {d.departamento}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">
-                    Municipio / ciudad
-                  </label>
-                  <select
-                    required
-                    value={newProp.municipality}
-                    onChange={(e) =>
-                      setNewProp((prev) => ({
-                        ...prev,
-                        municipality: e.target.value,
-                      }))
-                    }
-                    disabled={!newProp.department}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400 disabled:bg-slate-100"
-                  >
-                    <option value="">Selecciona un municipio</option>
-                    {availableCities.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">
-                    Teléfono del propietario (WhatsApp)
-                  </label>
-                  <Input
-                    icon={Phone}
-                    type="tel"
-                    required
-                    placeholder="3103055424"
-                    value={newProp.ownerPhone}
-                    onChange={(e: any) =>
-                      setNewProp((prev) => ({
-                        ...prev,
-                        ownerPhone: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  id="is_rented"
-                  type="checkbox"
-                  checked={newProp.isRented}
-                  onChange={(e) =>
-                    setNewProp((prev) => ({
-                      ...prev,
-                      isRented: e.target.checked,
-                    }))
-                  }
-                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
-                />
-                <label
-                  htmlFor="is_rented"
-                  className="text-[11px] text-slate-600"
-                >
-                  El inmueble está arrendado
-                </label>
-              </div>
-
-              {newProp.isRented && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">
-                      Nombre del inquilino
-                    </label>
-                    <Input
-                      icon={UserIcon}
-                      type="text"
-                      required
-                      value={newProp.tenantName}
-                      onChange={(e: any) =>
-                        setNewProp((prev) => ({
-                          ...prev,
-                          tenantName: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">
-                      Email del inquilino
-                    </label>
-                    <Input
-                      icon={Mail}
-                      type="email"
-                      required
-                      value={newProp.tenantEmail}
-                      onChange={(e: any) =>
-                        setNewProp((prev) => ({
-                          ...prev,
-                          tenantEmail: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-slate-500 mb-1">
-                      WhatsApp del inquilino
-                    </label>
-                    <Input
-                      icon={Phone}
-                      type="tel"
-                      required
-                      value={newProp.tenantPhone}
-                      onChange={(e: any) =>
-                        setNewProp((prev) => ({
-                          ...prev,
-                          tenantPhone: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">
-                    Inicio del contrato (opcional)
-                  </label>
-                  <Input
-                    icon={Calendar}
-                    type="date"
-                    value={newProp.contractStart}
-                    onChange={(e: any) =>
-                      setNewProp((prev) => ({
-                        ...prev,
-                        contractStart: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">
-                    Fin del contrato (opcional)
-                  </label>
-                  <Input
-                    icon={Calendar}
-                    type="date"
-                    value={newProp.contractEnd}
-                    onChange={(e: any) =>
-                      setNewProp((prev) => ({
-                        ...prev,
-                        contractEnd: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end mt-2">
-                <Button disabled={loading} type="submit" className="gap-2">
-                  {loading ? (
-                    'Guardando...'
-                  ) : (
-                    <>
-                      <CheckCircle size={16} />
-                      Guardar inmueble
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </Card>
-        )}
-      </main>
-    </div>
-  );
-}
