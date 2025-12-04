@@ -161,28 +161,21 @@ interface Property {
 
 interface Provider {
   id: string;
-  name: string;
-  email?: string;
-  phone: string | null;
+  user_id: string | null;
   specialty: string;
   department: string;
   municipality: string;
-  user_id?: string | null;
-  is_active?: boolean;
+  is_active: boolean;
+  phone: string | null;
 }
-
-interface Ticket {
+interface Provider {
   id: string;
-  property_id: string;
-  title?: string;
-  category: string;
-  description: string;
-  priority: string;
-  status: string;
-  reporter: string;
-  reported_by_email?: string;
-  media_urls?: string[];
-  created_at?: string;
+  name: string;
+  email: string;
+  phone: string;
+  specialty: string;
+  department: string;
+  municipality: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -230,7 +223,6 @@ export default function HomePage() {
     category: string;
     description: string;
     priority: string;
-    providerOption?: string;
   };
 
   const [newTicket, setNewTicket] = useState<NewTicket>({
@@ -240,7 +232,130 @@ export default function HomePage() {
     priority: 'Media',
   });
 
-// ---------------------------------------------------------------------------
+  
+    try {
+      setLoading(true);
+
+      const property = properties.find((p) => p.id === newTicket.propertyId);
+
+      const { data, error } = await supabase
+        .from('tickets')
+        .insert([
+          {
+            property_id: newTicket.propertyId,
+            category: newTicket.category,
+            description: newTicket.description,
+            priority: newTicket.priority,
+            reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
+            status: 'Pendiente',
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTickets((prev) => [data as Ticket, ...prev]);
+      // 2) Subir archivos al bucket
+const mediaPaths: string[] = [];
+
+for (const file of ticketFiles) {
+  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  const path = `tickets/${data.id}/${Date.now()}-${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('tickets-media')
+    .upload(path, file);
+
+  if (uploadError) {
+    console.error('Error subiendo archivo', uploadError);
+    continue;
+  }
+
+  mediaPaths.push(path);
+}
+
+// 3) Actualizar ticket con media_urls
+if (mediaPaths.length > 0) {
+  const { error: updateError } = await supabase
+    .from('tickets')
+    .update({ media_urls: mediaPaths })
+    .eq('id', data.id);
+
+  if (updateError) {
+    console.error('Error actualizando media_urls', updateError);
+  }
+}
+      // -------------------------------
+      // Matching automático de proveedor
+      // -------------------------------
+      let whatsappNumber = KEYHOME_WHATSAPP; // por defecto, centro KeyhomeKey
+      let providerLabel = 'KeyhomeKey';
+
+      if (property) {
+        try {
+          const { data: providers } = await supabase
+            .from('providers')
+            .select('name, phone, specialty, department, municipality, is_active')
+            .eq('department', property.department)
+            .eq('municipality', property.municipality)
+            .eq('specialty', newTicket.category)
+            .eq('is_active', true)
+            .limit(1);
+
+          if (providers && providers.length > 0) {
+            const provider = providers[0] as any;
+            providerLabel = provider.name || 'Proveedor';
+
+            if (provider.phone) {
+              // Normalizamos el número: solo dígitos y agregamos 57 si hace falta
+              const digits = String(provider.phone).replace(/\D/g, '');
+              whatsappNumber = digits.startsWith('57')
+                ? digits
+                : `57${digits}`;
+            }
+          }
+        } catch (matchErr) {
+          console.error('Error buscando proveedores para el ticket:', matchErr);
+        }
+      }
+
+      // -------------------------------
+      // Abrir WhatsApp (proveedor o KeyhomeKey)
+      // -------------------------------
+      if (property && typeof window !== 'undefined') {
+        const text = encodeURIComponent(
+          `Nuevo ticket de ${
+            userRole === 'OWNER' ? 'propietario' : 'inquilino'
+          }.\n\n` +
+            `Inmueble: ${property.address} - ${property.municipality}, ${property.department}\n` +
+            `Categoría: ${newTicket.category}\n` +
+            `Prioridad: ${newTicket.priority}\n` +
+            `Descripción: ${newTicket.description}\n\n` +
+            `Asignado a: ${providerLabel}.`,
+        );
+
+        window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank');
+      }
+
+      // Resetear formulario
+      setNewTicket({
+        propertyId: '',
+        category: 'Plomería',
+        description: '',
+        priority: 'Media',
+      });
+
+      alert('Ticket creado correctamente.');
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error creando el ticket.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
   // INICIALIZACIÓN
   // ---------------------------------------------------------------------------
 
@@ -774,7 +889,7 @@ for (const file of ticketFiles) {
   const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
   const path = `tickets/${data.id}/${Date.now()}-${safeName}`;
 
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await supabase
     .from('tickets-media')
     .upload(path, file);
 
