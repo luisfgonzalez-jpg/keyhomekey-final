@@ -726,8 +726,8 @@ export default function HomePage() {
       return;
     }
 
-    // 1) Intentar encontrar un proveedor compatible
-    let assignedProvider: any = null;
+    // 1) Intentar encontrar un proveedor local compatible
+    let assignedProvider: Provider | null = null;
 
     try {
       const { data: providers, error: providersError } = await supabase
@@ -738,80 +738,139 @@ export default function HomePage() {
         .limit(1);
 
       if (providersError) {
-        console.error('Error buscando proveedores:', providersError);
+        console.error('Error buscando proveedores locales:', providersError);
       } else if (providers && providers.length > 0) {
-        assignedProvider = providers[0];
+        assignedProvider = providers[0] as Provider;
       }
     } catch (provErr) {
-      console.error('Error en matching de proveedor:', provErr);
+      console.error('Error en matching de proveedor local:', provErr);
     }
 
     // 2) Crear el ticket
     const { data, error } = await supabase
-  .from('tickets')
-  .insert([
-    {
-      property_id: newTicket.propertyId,
-      // 👇 Nuevo: título del ticket
-      title: `Ticket de ${newTicket.category}`,
-      category: newTicket.category,
-      description: newTicket.description,
-      priority: newTicket.priority,
-      reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
-      // 👇 Nuevo: quién lo reporta (email del usuario logueado)
-      reported_by_email: session.user.email ?? '',
-      status: 'Pendiente',
-    },
-  ])
-  .select()
-  .single();
+      .from('tickets')
+      .insert([
+        {
+          property_id: newTicket.propertyId,
+          title: `Ticket de ${newTicket.category}`,
+          category: newTicket.category,
+          description: newTicket.description,
+          priority: newTicket.priority,
+          reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
+          reported_by_email: session.user.email ?? '',
+          status: 'Pendiente',
+        },
+      ])
+      .select()
+      .single();
 
     if (error) throw error;
+
     // 3) Subir archivos al bucket
-const mediaPaths: string[] = [];
+    const mediaPaths: string[] = [];
 
-for (const file of ticketFiles) {
-  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-  const path = `tickets/${data.id}/${Date.now()}-${safeName}`;
+    for (const file of ticketFiles) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const path = `tickets/${data.id}/${Date.now()}-${safeName}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from('tickets-media')
-    .upload(path, file);
+      const { error: uploadError } = await supabase.storage
+        .from('tickets-media')
+        .upload(path, file);
 
-  if (uploadError) {
-    console.error('Error subiendo archivo', uploadError);
-    continue;
-  }
+      if (uploadError) {
+        console.error('Error subiendo archivo', uploadError);
+        continue;
+      }
 
-  mediaPaths.push(path);
-}
+      mediaPaths.push(path);
+    }
 
-// 4) Actualizar ticket con media_urls
-if (mediaPaths.length > 0) {
-  const { error: updateError } = await supabase
-    .from('tickets')
-    .update({ media_urls: mediaPaths })
-    .eq('id', data.id);
+    // 4) Actualizar ticket con media_urls
+    if (mediaPaths.length > 0) {
+      const { error: updateError } = await supabase
+        .from('tickets')
+        .update({ media_urls: mediaPaths })
+        .eq('id', data.id);
 
-  if (updateError) {
-    console.error('Error actualizando media_urls', updateError);
-  } else {
-    (data as any).media_urls = mediaPaths;
-  }
-}
+      if (updateError) {
+        console.error('Error actualizando media_urls', updateError);
+      } else {
+        (data as Ticket).media_urls = mediaPaths;
+      }
+    }
 
+    // 5) Llamar a Retel AI para matching de proveedores externos
+    let retelProvider: Provider | null = null;
+    let providerSource: 'retel' | 'local' | 'none' = 'none';
+
+    try {
+      const retelResponse = await fetch('/api/retel-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: newTicket.category,
+          description: newTicket.description,
+          priority: newTicket.priority,
+          location: {
+            department: property.department,
+            municipality: property.municipality,
+          },
+          ticketId: data.id,
+        }),
+      });
+
+      const retelData = await retelResponse.json();
+
+      if (retelData.success && retelData.providers && retelData.providers.length > 0) {
+        retelProvider = retelData.providers[0] as Provider;
+        console.log('✅ Retel provider found:', retelProvider.name);
+      }
+    } catch (retelErr) {
+      console.error('Error en Retel AI matching:', retelErr);
+      // Continue with local fallback - don't break the flow
+    }
+
+    // 6) Determinar proveedor a usar (Retel primero, luego local)
+    const providerToUse = retelProvider || assignedProvider;
+
+    if (retelProvider) {
+      providerSource = 'retel';
+    } else if (assignedProvider) {
+      providerSource = 'local';
+    }
+
+    // 7) Actualizar ticket con datos del proveedor asignado
+    if (providerToUse || providerSource !== 'none') {
+      const { error: providerUpdateError } = await supabase
+        .from('tickets')
+        .update({
+          assigned_provider_name: providerToUse?.name || null,
+          assigned_provider_phone: providerToUse?.phone || null,
+          assigned_provider_specialty: providerToUse?.specialty || null,
+          provider_source: providerSource,
+        })
+        .eq('id', data.id);
+
+      if (providerUpdateError) {
+        console.error('Error actualizando proveedor asignado:', providerUpdateError);
+      }
+    }
 
     setTickets((prev) => [data as Ticket, ...prev]);
+    setTicketFiles([]);
 
-    // 3) Mensaje de WhatsApp
+    // 8) Mensaje de WhatsApp
     if (property && typeof window !== 'undefined') {
-      const providerText = assignedProvider
-        ? `\n\nProveedor sugerido:\n- Nombre: ${
-            assignedProvider.name || 'Sin nombre'
+      const sourceLabel = providerSource === 'retel' ? 'Retel AI' : providerSource === 'local' ? 'Local' : '';
+      const providerText = providerToUse
+        ? `\n\nProveedor sugerido (${sourceLabel}):\n- Nombre: ${
+            providerToUse.name || 'Sin nombre'
           }\n- Teléfono: ${
-            assignedProvider.phone || 'Sin teléfono'
-          }\n- Ciudad: ${assignedProvider.municipality || ''}, ${
-            assignedProvider.department || ''
+            providerToUse.phone || 'Sin teléfono'
+          }\n- Especialidad: ${
+            providerToUse.specialty || 'General'
+          }\n- Ciudad: ${providerToUse.municipality || ''}, ${
+            providerToUse.department || ''
           }`
         : '\n\nAún no hay proveedor asociado. KeyhomeKey asignará uno.';
 
@@ -825,10 +884,12 @@ if (mediaPaths.length > 0) {
         }\nDescripción: ${newTicket.description}${providerText}`,
       );
 
-      window.open(`https://wa.me/${KEYHOME_WHATSAPP}?text=${text}`, '_blank');
+      // Use provider phone if available, fallback to KEYHOME_WHATSAPP
+      const whatsappNumber = providerToUse?.phone || KEYHOME_WHATSAPP;
+      window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank');
     }
 
-    // 4) Resetear formulario
+    // 9) Resetear formulario
     setNewTicket({
       propertyId: '',
       category: 'Plomería',
@@ -838,9 +899,10 @@ if (mediaPaths.length > 0) {
     });
 
     alert('Ticket creado correctamente.');
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(err);
-    alert(err.message || 'Error creando el ticket.');
+    const errorMessage = err instanceof Error ? err.message : 'Error creando el ticket.';
+    alert(errorMessage);
   } finally {
     setLoading(false);
   }
