@@ -27,6 +27,12 @@ import {
 
 const KEYHOME_WHATSAPP = '573103055424'; // número general de KeyhomeKey
 
+// Sanitize phone number for WhatsApp URL (remove non-numeric characters)
+const sanitizePhoneNumber = (phone: string | null): string | null => {
+  if (!phone) return null;
+  return phone.replace(/[^0-9]/g, '');
+};
+
 // -----------------------------------------------------------------------------
 // UI BÁSICA
 // -----------------------------------------------------------------------------
@@ -183,6 +189,10 @@ interface Ticket {
   reported_by_email?: string;
   media_urls?: string[];
   created_at?: string;
+  assigned_provider_name?: string | null;
+  assigned_provider_phone?: string | null;
+  assigned_provider_specialty?: string | null;
+  provider_source?: 'retel' | 'local' | 'none';
 }
 
 // -----------------------------------------------------------------------------
@@ -885,7 +895,8 @@ export default function HomePage() {
       );
 
       // Use provider phone if available, fallback to KEYHOME_WHATSAPP
-      const whatsappNumber = providerToUse?.phone || KEYHOME_WHATSAPP;
+      const sanitizedProviderPhone = sanitizePhoneNumber(providerToUse?.phone ?? null);
+      const whatsappNumber = sanitizedProviderPhone || KEYHOME_WHATSAPP;
       window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank');
     }
 

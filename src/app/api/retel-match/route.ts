@@ -57,7 +57,8 @@ export async function POST(request: Request) {
     }
 
     // 4. Call Retel AI API
-    const retelResponse = await fetch('https://api.retel.ai/v1/providers/search', {
+    const retelApiUrl = process.env.RETEL_API_URL || 'https://api.retel.ai/v1/providers/search';
+    const retelResponse = await fetch(retelApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -36,6 +36,7 @@ This project requires the following environment variables to be set:
 ### Required for Retel AI Provider Matching
 
 - `RETEL_API_KEY` - Your Retel AI API key for external provider matching
+- `RETEL_API_URL` - (Optional) Custom Retel AI API URL. Defaults to `https://api.retel.ai/v1/providers/search`
 
 ### Local Development
 
