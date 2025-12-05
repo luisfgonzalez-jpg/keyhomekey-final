@@ -803,8 +803,8 @@ if (mediaPaths.length > 0) {
 
     setTickets((prev) => [data as Ticket, ...prev]);
 
-    // 3) Mensaje de WhatsApp
-    if (property && typeof window !== 'undefined') {
+    // 3) Mensaje de WhatsApp (via backend API)
+    if (property) {
       const providerText = assignedProvider
         ? `\n\nProveedor sugerido:\n- Nombre: ${
             assignedProvider.name || 'Sin nombre'
@@ -815,17 +815,30 @@ if (mediaPaths.length > 0) {
           }`
         : '\n\nAún no hay proveedor asociado. KeyhomeKey asignará uno.';
 
-      const text = encodeURIComponent(
-        `Nuevo ticket de ${
-          userRole === 'OWNER' ? 'propietario' : 'inquilino'
-        }.\n\nInmueble: ${property.address} - ${property.municipality}, ${
-          property.department
-        }\nCategoría: ${newTicket.category}\nPrioridad: ${
-          newTicket.priority
-        }\nDescripción: ${newTicket.description}${providerText}`,
-      );
+      const message = `Nuevo ticket de ${
+        userRole === 'OWNER' ? 'propietario' : 'inquilino'
+      }.\n\nInmueble: ${property.address} - ${property.municipality}, ${
+        property.department
+      }\nCategoría: ${newTicket.category}\nPrioridad: ${
+        newTicket.priority
+      }\nDescripción: ${newTicket.description}${providerText}`;
 
-      window.open(`https://wa.me/${KEYHOME_WHATSAPP}?text=${text}`, '_blank');
+      try {
+        await fetch('/api/whatsapp/notify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': process.env.NEXT_PUBLIC_INTERNAL_API_KEY || '',
+          },
+          body: JSON.stringify({
+            to: KEYHOME_WHATSAPP,
+            message,
+          }),
+        });
+      } catch (whatsappErr) {
+        console.error('Error sending WhatsApp notification:', whatsappErr);
+        // Don't fail the ticket creation if WhatsApp notification fails
+      }
     }
 
     // 4) Resetear formulario
