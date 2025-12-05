@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+// Colombia country code for phone number normalization
+const COLOMBIA_COUNTRY_CODE = '57';
+
 interface WhatsAppNotifyRequest {
   to: string;
   message: string;
@@ -15,17 +18,65 @@ interface WhatsAppAPIResponse {
 }
 
 /**
+ * Validates the request is authorized.
+ * Authorization can be via:
+ * 1. API key in x-api-key header (for server-to-server calls)
+ * 2. Same-origin request (for frontend calls within the application)
+ */
+function isAuthorized(request: Request): boolean {
+  const apiKey = request.headers.get('x-api-key');
+  const internalApiKey = process.env.INTERNAL_API_KEY;
+
+  // If API key is provided and matches, authorize
+  if (apiKey && internalApiKey && apiKey === internalApiKey) {
+    return true;
+  }
+
+  // For same-origin requests (frontend calls), check the origin/referer header
+  const origin = request.headers.get('origin');
+  const referer = request.headers.get('referer');
+  const host = request.headers.get('host');
+
+  // Allow requests where origin or referer matches the host
+  if (host) {
+    if (origin) {
+      try {
+        const originUrl = new URL(origin);
+        if (originUrl.host === host) {
+          return true;
+        }
+      } catch {
+        // Invalid origin URL, continue to check referer
+      }
+    }
+
+    if (referer) {
+      try {
+        const refererUrl = new URL(referer);
+        if (refererUrl.host === host) {
+          return true;
+        }
+      } catch {
+        // Invalid referer URL
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Normalizes a phone number by:
  * 1. Removing all non-digit characters
- * 2. Prepending Colombia country code (57) if not already present
+ * 2. Prepending Colombia country code if not already present
  */
 function normalizePhoneNumber(phone: string): string {
   // Remove all non-digit characters
   const digits = phone.replace(/\D/g, '');
   
-  // Prepend 57 if not already present
-  if (!digits.startsWith('57')) {
-    return `57${digits}`;
+  // Prepend country code if not already present
+  if (!digits.startsWith(COLOMBIA_COUNTRY_CODE)) {
+    return `${COLOMBIA_COUNTRY_CODE}${digits}`;
   }
   
   return digits;
@@ -33,19 +84,8 @@ function normalizePhoneNumber(phone: string): string {
 
 export async function POST(request: Request) {
   try {
-    // 1. Validate internal API key
-    const apiKey = request.headers.get('x-api-key');
-    const internalApiKey = process.env.INTERNAL_API_KEY;
-
-    if (!internalApiKey) {
-      console.error('❌ INTERNAL_API_KEY not configured in environment');
-      return NextResponse.json(
-        { success: false, error: { message: 'Server configuration error' } },
-        { status: 500 }
-      );
-    }
-
-    if (!apiKey || apiKey !== internalApiKey) {
+    // 1. Validate authorization (API key or same-origin request)
+    if (!isAuthorized(request)) {
       return NextResponse.json(
         { success: false, error: { message: 'Unauthorized' } },
         { status: 401 }
@@ -57,9 +97,9 @@ export async function POST(request: Request) {
     const whatsappPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
     if (!whatsappToken || !whatsappPhoneNumberId) {
-      console.error('❌ WhatsApp API credentials not configured');
+      console.error('❌ WhatsApp API credentials not configured (WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID missing)');
       return NextResponse.json(
-        { success: false, error: { message: 'WhatsApp API not configured' } },
+        { success: false, error: { message: 'WhatsApp API credentials not configured' } },
         { status: 500 }
       );
     }
