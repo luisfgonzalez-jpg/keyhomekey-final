@@ -726,21 +726,33 @@ export default function HomePage() {
       return;
     }
 
-    // 1) Intentar encontrar un proveedor compatible
+    // 1) Intentar encontrar un proveedor compatible (por ubicación y especialidad)
     let assignedProvider: any = null;
 
     try {
-      const { data: providers, error: providersError } = await supabase
+      // First try to find a provider matching both location AND category/specialty
+      const { data: providersWithSpecialty, error: specialtyError } = await supabase
         .from('providers')
         .select('*')
         .eq('department', property.department)
         .eq('municipality', property.municipality)
+        .eq('specialty', newTicket.category)
         .limit(1);
 
-      if (providersError) {
-        console.error('Error buscando proveedores:', providersError);
-      } else if (providers && providers.length > 0) {
-        assignedProvider = providers[0];
+      if (!specialtyError && providersWithSpecialty && providersWithSpecialty.length > 0) {
+        assignedProvider = providersWithSpecialty[0];
+      } else {
+        // Fallback: find any provider in the same location
+        const { data: providers, error: providersError } = await supabase
+          .from('providers')
+          .select('*')
+          .eq('department', property.department)
+          .eq('municipality', property.municipality)
+          .limit(1);
+
+        if (!providersError && providers && providers.length > 0) {
+          assignedProvider = providers[0];
+        }
       }
     } catch (provErr) {
       console.error('Error en matching de proveedor:', provErr);
@@ -803,25 +815,43 @@ if (mediaPaths.length > 0) {
 
     setTickets((prev) => [data as Ticket, ...prev]);
 
-    // 3) Mensaje de WhatsApp (via backend API)
-    if (property) {
-      const providerText = assignedProvider
-        ? `\n\nProveedor sugerido:\n- Nombre: ${
-            assignedProvider.name || 'Sin nombre'
-          }\n- Teléfono: ${
-            assignedProvider.phone || 'Sin teléfono'
-          }\n- Ciudad: ${assignedProvider.municipality || ''}, ${
-            assignedProvider.department || ''
-          }`
-        : '\n\nAún no hay proveedor asociado. KeyhomeKey asignará uno.';
-
-      const message = `Nuevo ticket de ${
+    // 3) Mensaje de WhatsApp (via backend API) - Enviar al proveedor
+    if (property && assignedProvider && assignedProvider.phone) {
+      // Message to send to the provider
+      const message = `🔔 Nuevo ticket de ${
         userRole === 'OWNER' ? 'propietario' : 'inquilino'
-      }.\n\nInmueble: ${property.address} - ${property.municipality}, ${
+      }.\n\n📍 Inmueble: ${property.address} - ${property.municipality}, ${
         property.department
-      }\nCategoría: ${newTicket.category}\nPrioridad: ${
+      }\n🔧 Categoría: ${newTicket.category}\n⚡ Prioridad: ${
         newTicket.priority
-      }\nDescripción: ${newTicket.description}${providerText}`;
+      }\n📝 Descripción: ${newTicket.description}\n\nPor favor responda a este mensaje para confirmar disponibilidad.`;
+
+      try {
+        const response = await fetch('/api/whatsapp/notify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: assignedProvider.phone,
+            message,
+          }),
+        });
+        
+        if (!response.ok) {
+          console.error('Error en respuesta de WhatsApp API:', await response.text());
+        }
+      } catch (whatsappErr) {
+        console.error('Error sending WhatsApp notification:', whatsappErr);
+        // Don't fail the ticket creation if WhatsApp notification fails
+      }
+    } else if (property && !assignedProvider) {
+      // No provider found - notify KeyhomeKey center
+      const message = `🔔 Nuevo ticket SIN proveedor asignado.\n\n📍 Inmueble: ${property.address} - ${property.municipality}, ${
+        property.department
+      }\n🔧 Categoría: ${newTicket.category}\n⚡ Prioridad: ${
+        newTicket.priority
+      }\n📝 Descripción: ${newTicket.description}\n\n⚠️ No se encontró proveedor en esta zona. Por favor asignar manualmente.`;
 
       try {
         await fetch('/api/whatsapp/notify', {
@@ -835,8 +865,7 @@ if (mediaPaths.length > 0) {
           }),
         });
       } catch (whatsappErr) {
-        console.error('Error sending WhatsApp notification:', whatsappErr);
-        // Don't fail the ticket creation if WhatsApp notification fails
+        console.error('Error sending WhatsApp notification to KeyhomeKey:', whatsappErr);
       }
     }
 
