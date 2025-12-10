@@ -24,6 +24,13 @@ interface WhatsAppMessage {
   type: string;
 }
 
+interface WhatsAppMessageStatus {
+  id: string;
+  status: string;
+  timestamp: string;
+  recipient_id: string;
+}
+
 interface WhatsAppWebhookEntry {
   id: string;
   changes: Array<{
@@ -40,12 +47,7 @@ interface WhatsAppWebhookEntry {
         wa_id: string;
       }>;
       messages?: WhatsAppMessage[];
-      statuses?: Array<{
-        id: string;
-        status: string;
-        timestamp: string;
-        recipient_id: string;
-      }>;
+      statuses?: WhatsAppMessageStatus[];
     };
     field: string;
   }>;
@@ -130,7 +132,7 @@ export async function POST(request: Request) {
         // Handle message status updates (sent, delivered, read, failed)
         if (value.statuses && value.statuses.length > 0) {
           for (const status of value.statuses) {
-            handleMessageStatus(status);
+            await handleMessageStatus(status);
           }
         }
       }
@@ -182,7 +184,7 @@ async function handleIncomingMessage(
 /**
  * Handle message status updates
  */
-function handleMessageStatus(status: WhatsAppWebhookEntry['changes'][0]['value']['statuses'][0]) {
+async function handleMessageStatus(status: WhatsAppMessageStatus) {
   console.log('📊 Message status update:', {
     messageId: status.id,
     status: status.status,
