@@ -25,13 +25,7 @@ import {
   FileText,
 } from 'lucide-react';
 
-const KEYHOME_WHATSAPP = '573103055424'; // número general de KeyhomeKey
-
-// Sanitize phone number for WhatsApp URL (remove non-numeric characters)
-const sanitizePhoneNumber = (phone: string | null): string | null => {
-  if (!phone) return null;
-  return phone.replace(/[^0-9]/g, '');
-};
+const KEYHOME_WHATSAPP = '573202292534'; // número general de KeyhomeKey
 
 // -----------------------------------------------------------------------------
 // UI BÁSICA
@@ -65,118 +59,19 @@ const Button = ({
       'bg-red-600 text-white hover:bg-red-500 focus:ring-red-600 border border-transparent',
   };
 
-  const disabledStyle = disabled
-    ? 'opacity-60 cursor-not-allowed'
-    : 'cursor-pointer';
-
   return (
     <button
-      type={type}
       onClick={onClick}
+      type={type}
       disabled={disabled}
-      className={`${base} ${variants[variant]} ${disabledStyle} ${className}`}
+      className={`${base} ${variants[variant]} ${className}`}
     >
       {children}
     </button>
   );
 };
 
-const Card = ({
-  children,
-  className = '',
-  id,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  id?: string;
-}) => (
-  <div
-    id={id}
-    className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ${className}`}
-  >
-    {children}
-  </div>
-);
-
-const Input = ({ icon: Icon, ...props }: any) => (
-  <div className="relative">
-    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-      <Icon size={20} />
-    </div>
-    <input
-      {...props}
-      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none transition-all"
-    />
-  </div>
-);
-
-const TextArea = ({ icon: Icon, ...props }: any) => (
-  <div className="relative">
-    <div className="absolute left-3 top-4 text-slate-400">
-      <Icon size={20} />
-    </div>
-    <textarea
-      {...props}
-      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:bg-white focus:border-slate-400 outline-none transition-all min-h-[90px] resize-vertical"
-    />
-  </div>
-);
-
-const StatusBadge = ({ status }: { status: string }) => {
-  let color = 'bg-slate-100 text-slate-700';
-  if (status === 'Pendiente')
-    color = 'bg-amber-100 text-amber-800 border border-amber-200';
-  if (status === 'Asignado')
-    color = 'bg-blue-100 text-blue-800 border border-blue-200';
-  if (status === 'En Camino')
-    color = 'bg-indigo-100 text-indigo-800 border border-indigo-200';
-  if (status === 'Resuelto')
-    color = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
-  if (status === 'Cancelado')
-    color = 'bg-red-100 text-red-800 border border-red-200';
-
-  return (
-    <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${color}`}
-    >
-      {status}
-    </span>
-  );
-};
-
-// -----------------------------------------------------------------------------
-// TIPOS
-// -----------------------------------------------------------------------------
-
-type Role = 'OWNER' | 'TENANT' | 'PROVIDER' | null;
-
-interface Property {
-  id: string;
-  address: string;
-  department: string;
-  municipality: string;
-  type: string;
-  owner_phone: string;
-  is_rented: boolean;
-  tenant_name: string | null;
-  tenant_email: string | null;
-  tenant_phone: string | null;
-  contract_start_date: string | null;
-  contract_end_date: string | null;
-}
-
-interface Provider {
-  id: string;
-  name: string;
-  email?: string;
-  phone: string | null;
-  specialty: string;
-  department: string;
-  municipality: string;
-  user_id?: string | null;
-  is_active?: boolean;
-}
-
+// Ticket interface
 interface Ticket {
   id: string;
   property_id: string;
@@ -189,11 +84,108 @@ interface Ticket {
   reported_by_email?: string;
   media_urls?: string[];
   created_at?: string;
-  assigned_provider_name?: string | null;
-  assigned_provider_phone?: string | null;
-  assigned_provider_specialty?: string | null;
-  provider_source?: 'retel' | 'local' | 'none';
 }
+
+// Types
+type Role = 'OWNER' | 'TENANT' | 'PROVIDER' | null;
+
+interface Property {
+  id: string;
+  owner_id?: string;
+  address: string;
+  type: string;
+  department: string;
+  municipality: string;
+  owner_phone?: string;
+  is_rented: boolean;
+  tenant_name?: string;
+  tenant_email?: string;
+  tenant_phone?: string;
+  contract_start_date?: string;
+  contract_end_date?: string;
+  created_at?: string;
+}
+
+// UI Components
+const Card = ({ children, className = '', ...props }: any) => (
+  <div
+    className={`border border-slate-200 rounded-2xl bg-white shadow-sm ${className}`}
+    {...props}
+  >
+    {children}
+  </div>
+);
+
+const Input = ({
+  icon: Icon,
+  type = 'text',
+  placeholder = '',
+  required = false,
+  value = '',
+  onChange = () => {},
+  ...props
+}: any) => (
+  <div className="relative">
+    {Icon && (
+      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+    )}
+    <input
+      type={type}
+      placeholder={placeholder}
+      required={required}
+      value={value}
+      onChange={onChange}
+      className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400 ${
+        Icon ? 'pl-10' : ''
+      }`}
+      {...props}
+    />
+  </div>
+);
+
+const TextArea = ({
+  icon: Icon,
+  placeholder = '',
+  required = false,
+  value = '',
+  onChange = () => {},
+  ...props
+}: any) => (
+  <div className="relative">
+    {Icon && (
+      <Icon className="absolute left-3 top-3 text-slate-400" size={16} />
+    )}
+    <textarea
+      placeholder={placeholder}
+      required={required}
+      value={value}
+      onChange={onChange}
+      className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400 resize-none ${
+        Icon ? 'pl-10' : ''
+      }`}
+      rows={3}
+      {...props}
+    />
+  </div>
+);
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const colors: Record<string, string> = {
+    Pendiente: 'bg-yellow-100 text-yellow-700',
+    'En progreso': 'bg-blue-100 text-blue-700',
+    Resuelto: 'bg-green-100 text-green-700',
+    Propietario: 'bg-slate-100 text-slate-700',
+    Inquilino: 'bg-slate-100 text-slate-700',
+    Proveedor: 'bg-slate-100 text-slate-700',
+    Usuario: 'bg-slate-100 text-slate-700',
+  };
+
+  return (
+    <span className={`text-[11px] font-semibold px-2 py-1 rounded-full ${colors[status] || 'bg-slate-100 text-slate-700'}`}>
+      {status}
+    </span>
+  );
+};
 
 // -----------------------------------------------------------------------------
 // PÁGINA PRINCIPAL
@@ -718,276 +710,94 @@ export default function HomePage() {
 };
 
 
- const createTicket = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!session?.user) return;
+  const createTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.user) return;
 
-  if (!newTicket.propertyId) {
-    alert('Selecciona un inmueble.');
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    const property = properties.find((p) => p.id === newTicket.propertyId);
-    if (!property) {
-      alert('No encontramos el inmueble seleccionado.');
+    if (!newTicket.propertyId) {
+      alert('Selecciona un inmueble.');
       return;
     }
 
-    // 1) Intentar encontrar un proveedor local compatible
-    let assignedProvider: Provider | null = null;
-    // 1) Intentar encontrar un proveedor compatible (por ubicación y especialidad)
-    let assignedProvider: any = null;
-
     try {
-      // First try to find a provider matching both location AND category/specialty
-      const { data: providersWithSpecialty, error: specialtyError } = await supabase
-        .from('providers')
-        .select('*')
-        .eq('department', property.department)
-        .eq('municipality', property.municipality)
-        .eq('specialty', newTicket.category)
-        .limit(1);
+      setLoading(true);
 
-      if (providersError) {
-        console.error('Error buscando proveedores locales:', providersError);
-      } else if (providers && providers.length > 0) {
-        assignedProvider = providers[0] as Provider;
-      if (!specialtyError && providersWithSpecialty && providersWithSpecialty.length > 0) {
-        assignedProvider = providersWithSpecialty[0];
-      } else {
-        // Fallback: find any provider in the same location
-        const { data: providers, error: providersError } = await supabase
-          .from('providers')
-          .select('*')
-          .eq('department', property.department)
-          .eq('municipality', property.municipality)
-          .limit(1);
+      const property = properties.find((p) => p.id === newTicket.propertyId);
+      if (!property) {
+        alert('No encontramos el inmueble seleccionado.');
+        return;
+      }
 
-        if (!providersError && providers && providers.length > 0) {
-          assignedProvider = providers[0];
+      // 1) Subir archivos al bucket (ruta temporal)
+      const mediaPaths: string[] = [];
+
+      for (const file of ticketFiles) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const path = `tickets/tmp/${Date.now()}-${safeName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('tickets-media')
+          .upload(path, file);
+
+        if (uploadError) {
+          console.error('Error subiendo archivo', uploadError);
+          continue;
         }
-      }
-    } catch (provErr) {
-      console.error('Error en matching de proveedor local:', provErr);
-    }
 
-    // 2) Crear el ticket
-    const { data, error } = await supabase
-      .from('tickets')
-      .insert([
-        {
-          property_id: newTicket.propertyId,
-          title: `Ticket de ${newTicket.category}`,
-          category: newTicket.category,
-          description: newTicket.description,
-          priority: newTicket.priority,
-          reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
-          reported_by_email: session.user.email ?? '',
-          status: 'Pendiente',
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // 3) Subir archivos al bucket
-    const mediaPaths: string[] = [];
-
-    for (const file of ticketFiles) {
-      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-      const path = `tickets/${data.id}/${Date.now()}-${safeName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('tickets-media')
-        .upload(path, file);
-
-      if (uploadError) {
-        console.error('Error subiendo archivo', uploadError);
-        continue;
+        mediaPaths.push(path);
       }
 
-      mediaPaths.push(path);
-    }
+      // 2) POSTear al endpoint server para crear ticket y enviar WhatsApp
+      const payload = {
+        propertyId: newTicket.propertyId,
+        category: newTicket.category,
+        description: newTicket.description,
+        priority: newTicket.priority,
+        mediaPaths,
+        reported_by_email: session.user.email ?? '',
+        reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
+      };
 
-    // 4) Actualizar ticket con media_urls
-    if (mediaPaths.length > 0) {
-      const { error: updateError } = await supabase
-        .from('tickets')
-        .update({ media_urls: mediaPaths })
-        .eq('id', data.id);
-
-      if (updateError) {
-        console.error('Error actualizando media_urls', updateError);
-      } else {
-        (data as Ticket).media_urls = mediaPaths;
-      }
-    }
-
-    // 5) Llamar a Retel AI para matching de proveedores externos
-    let retelProvider: Provider | null = null;
-    let providerSource: 'retel' | 'local' | 'none' = 'none';
-
-    try {
-      const retelResponse = await fetch('/api/retel-match', {
+      const resp = await fetch('/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: newTicket.category,
-          description: newTicket.description,
-          priority: newTicket.priority,
-          location: {
-            department: property.department,
-            municipality: property.municipality,
-          },
-          ticketId: data.id,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const retelData = await retelResponse.json();
+      const result = await resp.json();
 
-      if (retelData.success && retelData.providers && retelData.providers.length > 0) {
-        retelProvider = retelData.providers[0] as Provider;
-        console.log('✅ Retel provider found:', retelProvider.name);
+      if (!result || !result.success) {
+        console.error(
+          'Error creando ticket en servidor:',
+          result?.error || result,
+        );
+        alert('Error creando ticket en servidor. Revisa la consola.');
+        return;
       }
-    } catch (retelErr) {
-      console.error('Error en Retel AI matching:', retelErr);
-      // Continue with local fallback - don't break the flow
-    }
 
-    // 6) Determinar proveedor a usar (Retel primero, luego local)
-    const providerToUse = retelProvider || assignedProvider;
+      const created = result.ticket as Ticket;
+      setTickets((prev) => [created, ...prev]);
 
-    if (retelProvider) {
-      providerSource = 'retel';
-    } else if (assignedProvider) {
-      providerSource = 'local';
-    }
+      // 3) Resetear formulario
+      setNewTicket({
+        propertyId: '',
+        category: 'Plomería',
+        description: '',
+        priority: 'Media',
+        providerOption: 'KeyhomeKey',
+      });
+      setTicketFiles([]);
 
-    // 7) Actualizar ticket con datos del proveedor asignado
-    if (providerToUse || providerSource !== 'none') {
-      const { error: providerUpdateError } = await supabase
-        .from('tickets')
-        .update({
-          assigned_provider_name: providerToUse?.name || null,
-          assigned_provider_phone: providerToUse?.phone || null,
-          assigned_provider_specialty: providerToUse?.specialty || null,
-          provider_source: providerSource,
-        })
-        .eq('id', data.id);
-
-      if (providerUpdateError) {
-        console.error('Error actualizando proveedor asignado:', providerUpdateError);
-      }
-    }
-
-    setTickets((prev) => [data as Ticket, ...prev]);
-    setTicketFiles([]);
-
-    // 8) Mensaje de WhatsApp
-    if (property && typeof window !== 'undefined') {
-      const sourceLabel = providerSource === 'retel' ? 'Retel AI' : providerSource === 'local' ? 'Local' : '';
-      const providerText = providerToUse
-        ? `\n\nProveedor sugerido (${sourceLabel}):\n- Nombre: ${
-            providerToUse.name || 'Sin nombre'
-          }\n- Teléfono: ${
-            providerToUse.phone || 'Sin teléfono'
-          }\n- Especialidad: ${
-            providerToUse.specialty || 'General'
-          }\n- Ciudad: ${providerToUse.municipality || ''}, ${
-            providerToUse.department || ''
-          }`
-        : '\n\nAún no hay proveedor asociado. KeyhomeKey asignará uno.';
-
-      const text = encodeURIComponent(
-        `Nuevo ticket de ${
-          userRole === 'OWNER' ? 'propietario' : 'inquilino'
-        }.\n\nInmueble: ${property.address} - ${property.municipality}, ${
-          property.department
-        }\nCategoría: ${newTicket.category}\nPrioridad: ${
-          newTicket.priority
-        }\nDescripción: ${newTicket.description}${providerText}`,
+      alert(
+        'Ticket creado correctamente. KeyhomeKey enviará notificación por WhatsApp al proveedor.',
       );
-
-      // Use provider phone if available, fallback to KEYHOME_WHATSAPP
-      const sanitizedProviderPhone = sanitizePhoneNumber(providerToUse?.phone ?? null);
-      const whatsappNumber = sanitizedProviderPhone || KEYHOME_WHATSAPP;
-      window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank');
-    // 3) Mensaje de WhatsApp (via backend API) - Enviar al proveedor
-    if (property && assignedProvider && assignedProvider.phone) {
-      // Message to send to the provider
-      const message = `🔔 Nuevo ticket de ${
-        userRole === 'OWNER' ? 'propietario' : 'inquilino'
-      }.\n\n📍 Inmueble: ${property.address} - ${property.municipality}, ${
-        property.department
-      }\n🔧 Categoría: ${newTicket.category}\n⚡ Prioridad: ${
-        newTicket.priority
-      }\n📝 Descripción: ${newTicket.description}\n\nPor favor responda a este mensaje para confirmar disponibilidad.`;
-
-      try {
-        const response = await fetch('/api/whatsapp/notify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: assignedProvider.phone,
-            message,
-          }),
-        });
-        
-        if (!response.ok) {
-          console.error('Error en respuesta de WhatsApp API:', await response.text());
-        }
-      } catch (whatsappErr) {
-        console.error('Error sending WhatsApp notification:', whatsappErr);
-        // Don't fail the ticket creation if WhatsApp notification fails
-      }
-    } else if (property && !assignedProvider) {
-      // No provider found - notify KeyhomeKey center
-      const message = `🔔 Nuevo ticket SIN proveedor asignado.\n\n📍 Inmueble: ${property.address} - ${property.municipality}, ${
-        property.department
-      }\n🔧 Categoría: ${newTicket.category}\n⚡ Prioridad: ${
-        newTicket.priority
-      }\n📝 Descripción: ${newTicket.description}\n\n⚠️ No se encontró proveedor en esta zona. Por favor asignar manualmente.`;
-
-      try {
-        await fetch('/api/whatsapp/notify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: KEYHOME_WHATSAPP,
-            message,
-          }),
-        });
-      } catch (whatsappErr) {
-        console.error('Error sending WhatsApp notification to KeyhomeKey:', whatsappErr);
-      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error creando el ticket.');
+    } finally {
+      setLoading(false);
     }
-
-    // 9) Resetear formulario
-    setNewTicket({
-      propertyId: '',
-      category: 'Plomería',
-      description: '',
-      priority: 'Media',
-      providerOption: 'KeyhomeKey',
-    });
-
-    alert('Ticket creado correctamente.');
-  } catch (err: unknown) {
-    console.error(err);
-    const errorMessage = err instanceof Error ? err.message : 'Error creando el ticket.';
-    alert(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // ---------------------------------------------------------------------------
   // VISTAS
@@ -1526,7 +1336,7 @@ export default function HomePage() {
                     icon={Phone}
                     type="tel"
                     required
-                    placeholder="3103055424"
+                    placeholder="3202292534"
                     value={newProp.ownerPhone}
                     onChange={(e: any) =>
                       setNewProp((prev) => ({

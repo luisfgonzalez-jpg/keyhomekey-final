@@ -1,0 +1,3 @@
+Patch will: - Fix Button component (remove stray upload code inside it) - Add proper Ticket interface where fragment existed - Replace createTicket implementation to upload files to tickets/tmp and POST to /api/tickets (no window.open) - Reset form and update tickets state
+
+This is a non-executable note created before applying the patch.
