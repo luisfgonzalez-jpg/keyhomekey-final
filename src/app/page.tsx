@@ -738,8 +738,6 @@ export default function HomePage() {
 
     // 1) Intentar encontrar un proveedor local compatible
     let assignedProvider: Provider | null = null;
-    // 1) Intentar encontrar un proveedor compatible (por ubicación y especialidad)
-    let assignedProvider: any = null;
 
     try {
       // First try to find a provider matching both location AND category/specialty
@@ -751,10 +749,6 @@ export default function HomePage() {
         .eq('specialty', newTicket.category)
         .limit(1);
 
-      if (providersError) {
-        console.error('Error buscando proveedores locales:', providersError);
-      } else if (providers && providers.length > 0) {
-        assignedProvider = providers[0] as Provider;
       if (!specialtyError && providersWithSpecialty && providersWithSpecialty.length > 0) {
         assignedProvider = providersWithSpecialty[0];
       } else {
@@ -887,36 +881,7 @@ export default function HomePage() {
     setTickets((prev) => [data as Ticket, ...prev]);
     setTicketFiles([]);
 
-    // 8) Mensaje de WhatsApp
-    if (property && typeof window !== 'undefined') {
-      const sourceLabel = providerSource === 'retel' ? 'Retel AI' : providerSource === 'local' ? 'Local' : '';
-      const providerText = providerToUse
-        ? `\n\nProveedor sugerido (${sourceLabel}):\n- Nombre: ${
-            providerToUse.name || 'Sin nombre'
-          }\n- Teléfono: ${
-            providerToUse.phone || 'Sin teléfono'
-          }\n- Especialidad: ${
-            providerToUse.specialty || 'General'
-          }\n- Ciudad: ${providerToUse.municipality || ''}, ${
-            providerToUse.department || ''
-          }`
-        : '\n\nAún no hay proveedor asociado. KeyhomeKey asignará uno.';
-
-      const text = encodeURIComponent(
-        `Nuevo ticket de ${
-          userRole === 'OWNER' ? 'propietario' : 'inquilino'
-        }.\n\nInmueble: ${property.address} - ${property.municipality}, ${
-          property.department
-        }\nCategoría: ${newTicket.category}\nPrioridad: ${
-          newTicket.priority
-        }\nDescripción: ${newTicket.description}${providerText}`,
-      );
-
-      // Use provider phone if available, fallback to KEYHOME_WHATSAPP
-      const sanitizedProviderPhone = sanitizePhoneNumber(providerToUse?.phone ?? null);
-      const whatsappNumber = sanitizedProviderPhone || KEYHOME_WHATSAPP;
-      window.open(`https://wa.me/${whatsappNumber}?text=${text}`, '_blank');
-    // 3) Mensaje de WhatsApp (via backend API) - Enviar al proveedor
+    // 8) Mensaje de WhatsApp (via backend API) - Enviar al proveedor
     if (property && assignedProvider && assignedProvider.phone) {
       // Message to send to the provider
       const message = `🔔 Nuevo ticket de ${
