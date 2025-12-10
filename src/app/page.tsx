@@ -908,7 +908,7 @@ export default function HomePage() {
         if (!response.ok) {
           console.error('Error en respuesta de WhatsApp API:', await response.text());
         } else {
-          console.log('✅ WhatsApp notification sent successfully to provider');
+          console.log(`✅ WhatsApp notification sent successfully to provider: ${providerToUse.name} (${providerToUse.phone})`);
         }
       } catch (whatsappErr) {
         console.error('Error sending WhatsApp notification:', whatsappErr);
