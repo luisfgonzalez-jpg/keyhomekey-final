@@ -38,6 +38,12 @@ This project requires the following environment variables to be set:
 - `RETEL_API_KEY` - Your Retel AI API key for external provider matching
 - `RETEL_API_URL` - (Optional) Custom Retel AI API URL. Defaults to `https://api.retel.ai/v1/providers/search`
 
+### Required for WhatsApp Notifications
+
+- `WHATSAPP_TOKEN` - Your WhatsApp Business Cloud API access token
+- `WHATSAPP_PHONE_NUMBER_ID` - Your WhatsApp Business Phone Number ID
+- `INTERNAL_API_KEY` - (Optional) API key for securing internal API endpoints
+
 ### Local Development
 
 Create a `.env.local` file in the root directory with:
@@ -47,6 +53,9 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 RESEND_API_KEY=your-resend-key
 RETEL_API_KEY=your-retel-key
+WHATSAPP_TOKEN=your-whatsapp-token
+WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
+INTERNAL_API_KEY=your-internal-api-key
 ```
 
 ## Learn More
@@ -70,5 +79,8 @@ When deploying to Vercel, add the following environment variables in your projec
 2. `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 3. `RESEND_API_KEY`
 4. `RETEL_API_KEY`
+5. `WHATSAPP_TOKEN`
+6. `WHATSAPP_PHONE_NUMBER_ID`
+7. `INTERNAL_API_KEY` (Optional, for securing server-to-server API calls)
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
