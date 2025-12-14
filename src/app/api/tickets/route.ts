@@ -93,7 +93,8 @@ export async function POST(request: Request) {
       try {
         // Validar formato del número de teléfono (debe incluir código de país)
         if (!whatsappNumber || whatsappNumber.length < 10) {
-          console.warn('⚠️ Invalid phone number format:', whatsappNumber);
+          console.warn('⚠️ Invalid phone number format - skipping WhatsApp notification');
+          // No continuar con el envío si el número es inválido
         } else {
           const url = `https://graph.facebook.com/v16.0/${WA_PHONE_ID}/messages`;
           const payload = {
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
             text: { body: text },
           };
 
-          console.log('📤 Sending WhatsApp message to:', whatsappNumber);
+          console.log('📤 Sending WhatsApp message...');
 
           const resp = await fetch(url, {
             method: 'POST',
@@ -122,11 +123,11 @@ export async function POST(request: Request) {
           } else if (waResponse.error) {
             // Manejar errores específicos de la API de WhatsApp
             console.error('❌ WhatsApp API error:', {
-              code: waResponse.error.code,
-              message: waResponse.error.message,
-              type: waResponse.error.type,
-              error_data: waResponse.error.error_data,
-              fbtrace_id: waResponse.error.fbtrace_id
+              code: waResponse.error?.code,
+              message: waResponse.error?.message,
+              type: waResponse.error?.type,
+              error_data: waResponse.error?.error_data,
+              fbtrace_id: waResponse.error?.fbtrace_id
             });
           } else {
             console.error('❌ WhatsApp API returned unexpected response:', {
