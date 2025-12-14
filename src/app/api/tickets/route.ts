@@ -92,7 +92,10 @@ export async function POST(request: Request) {
     if (WA_PHONE_ID && WA_TOKEN) {
       try {
         // Validar formato del número de teléfono (debe incluir código de país)
-        if (!whatsappNumber || whatsappNumber.length < 10) {
+        // El número debe ser solo dígitos y tener al menos 11 caracteres (código país + número)
+        const isValidPhone = whatsappNumber && /^\d{11,15}$/.test(whatsappNumber);
+        
+        if (!isValidPhone) {
           console.warn('⚠️ Invalid phone number format - skipping WhatsApp notification');
           // No continuar con el envío si el número es inválido
         } else {
@@ -119,7 +122,8 @@ export async function POST(request: Request) {
 
           // Verificar el estado de la respuesta
           if (resp.ok && waResponse.messages && waResponse.messages.length > 0) {
-            console.log('✅ WhatsApp message sent successfully. Message ID:', waResponse.messages[0].id);
+            const messageId = waResponse.messages[0]?.id;
+            console.log('✅ WhatsApp message sent successfully. Message ID:', messageId || 'N/A');
           } else if (waResponse.error) {
             // Manejar errores específicos de la API de WhatsApp
             console.error('❌ WhatsApp API error:', {
