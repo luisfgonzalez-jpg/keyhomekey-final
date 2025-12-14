@@ -92,7 +92,8 @@ export async function POST(request: Request) {
     if (WA_PHONE_ID && WA_TOKEN) {
       try {
         // Validar formato del número de teléfono (debe incluir código de país)
-        // El número debe ser solo dígitos y tener al menos 11 caracteres (código país + número)
+        // El número debe ser solo dígitos (ya normalizado sin '+' en línea 74-75)
+        // y tener al menos 11 caracteres (código país + número)
         const isValidPhone = whatsappNumber && /^\d{11,15}$/.test(whatsappNumber);
         
         if (!isValidPhone) {
