@@ -84,36 +84,69 @@ export async function POST(request: Request) {
     const text = `Nuevo ticket de ${reporter}.\n\nInmueble: ${property?.address || ''} - ${property?.municipality || ''}, ${property?.department || ''}\nCategoría: ${category}\nPrioridad: ${priority}\nDescripción: ${description}\n\nAsignado a: ${providerLabel}.`;
 
     // 5) Llamada a WhatsApp Business API (Meta)
-    const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
+    const WA_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
     const WA_TOKEN = process.env.WHATSAPP_TOKEN;
 
     let waResponse = null;
 
     if (WA_PHONE_ID && WA_TOKEN) {
       try {
-        const url = `https://graph.facebook.com/v16.0/${WA_PHONE_ID}/messages`;
-        const payload = {
-          messaging_product: 'whatsapp',
-          to: whatsappNumber,
-          type: 'text',
-          text: { body: text },
-        };
+        // Validar formato del número de teléfono (debe incluir código de país)
+        if (!whatsappNumber || whatsappNumber.length < 10) {
+          console.warn('⚠️ Invalid phone number format:', whatsappNumber);
+        } else {
+          const url = `https://graph.facebook.com/v16.0/${WA_PHONE_ID}/messages`;
+          const payload = {
+            messaging_product: 'whatsapp',
+            to: whatsappNumber,
+            type: 'text',
+            text: { body: text },
+          };
 
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${WA_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
+          console.log('📤 Sending WhatsApp message to:', whatsappNumber);
 
-        waResponse = await resp.json();
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${WA_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          waResponse = await resp.json();
+
+          // Verificar el estado de la respuesta
+          if (resp.ok && waResponse.messages && waResponse.messages.length > 0) {
+            console.log('✅ WhatsApp message sent successfully. Message ID:', waResponse.messages[0].id);
+          } else if (waResponse.error) {
+            // Manejar errores específicos de la API de WhatsApp
+            console.error('❌ WhatsApp API error:', {
+              code: waResponse.error.code,
+              message: waResponse.error.message,
+              type: waResponse.error.type,
+              error_data: waResponse.error.error_data,
+              fbtrace_id: waResponse.error.fbtrace_id
+            });
+          } else {
+            console.error('❌ WhatsApp API returned unexpected response:', {
+              status: resp.status,
+              statusText: resp.statusText,
+              response: waResponse
+            });
+          }
+        }
       } catch (err) {
-        console.error('Error calling WhatsApp API:', err);
+        console.error('❌ Error calling WhatsApp API:', err);
+        if (err instanceof Error) {
+          console.error('Error details:', {
+            message: err.message,
+            stack: err.stack
+          });
+        }
       }
     } else {
-      console.warn('WhatsApp env vars not configured (WHATSAPP_PHONE_ID / WHATSAPP_TOKEN)');
+      console.warn('⚠️ WhatsApp env vars not configured (WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_TOKEN)');
     }
 
     return NextResponse.json({ success: true, ticket: ticketData, whatsapp: waResponse });
