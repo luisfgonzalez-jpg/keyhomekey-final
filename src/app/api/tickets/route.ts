@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabaseServer';
+import { searchExternalProviders } from '@/lib/googleProviderSearch';
+import type { ExternalProvider } from '@/type/googleProvider';
 
 const DEFAULT_WHATSAPP = process.env.KEYHOME_WHATSAPP || '573103055424';
 
@@ -52,12 +54,14 @@ export async function POST(request: Request) {
       .eq('id', propertyId)
       .single();
 
-    // 3) Buscar proveedor
+    // 3) Buscar proveedor interno
     let whatsappNumber = DEFAULT_WHATSAPP;
     let providerLabel = 'KeyhomeKey';
+    let externalProviders: ExternalProvider[] = [];
 
     if (property) {
       try {
+        // 3a) Buscar proveedor interno en la base de datos
         const { data: providers } = await supabase
           .from('providers')
           .select('name, phone, specialty, department, municipality, is_active')
@@ -74,6 +78,44 @@ export async function POST(request: Request) {
             const digits = String(provider.phone).replace(/\D/g, '');
             whatsappNumber = digits.startsWith('57') ? digits : `57${digits}`;
           }
+          console.log(`✅ Internal provider found: ${providerLabel}`);
+        } else {
+          console.log('ℹ️ No internal provider found, searching external providers...');
+        }
+
+        // 3b) Buscar proveedores externos via Google (siempre, para tener opciones adicionales)
+        try {
+          externalProviders = await searchExternalProviders({
+            category,
+            location: {
+              department: property.department,
+              municipality: property.municipality,
+            },
+            description,
+          });
+
+          // Guardar proveedores externos en el ticket como metadata
+          // Nota: Requiere columna 'external_providers' (JSONB) en la tabla tickets
+          // Ver DATABASE_MIGRATION.md para instrucciones de migración
+          if (externalProviders.length > 0) {
+            try {
+              await supabase
+                .from('tickets')
+                .update({
+                  external_providers: externalProviders,
+                })
+                .eq('id', ticketData.id);
+              
+              console.log(`✅ Stored ${externalProviders.length} external providers in ticket metadata`);
+            } catch (updateErr) {
+              // Non-fatal: ticket was created, just couldn't store external providers
+              console.warn('⚠️ Could not store external providers in database. Column may not exist.', updateErr);
+              console.warn('   See DATABASE_MIGRATION.md for migration instructions.');
+            }
+          }
+        } catch (extErr) {
+          console.error('Error searching external providers:', extErr);
+          // Non-fatal error, continue with ticket creation
         }
       } catch (err) {
         console.error('Error finding provider:', err);
@@ -155,7 +197,13 @@ export async function POST(request: Request) {
       console.warn('⚠️ WhatsApp env vars not configured (WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_TOKEN)');
     }
 
-    return NextResponse.json({ success: true, ticket: ticketData, whatsapp: waResponse });
+    return NextResponse.json({ 
+      success: true, 
+      ticket: ticketData, 
+      whatsapp: waResponse,
+      externalProviders: externalProviders.length > 0 ? externalProviders : undefined,
+      internalProviderFound: providerLabel !== 'KeyhomeKey',
+    });
   } catch (error: any) {
     console.error('Unexpected error in /api/tickets:', error);
     return NextResponse.json({ success: false, error: { message: error.message || 'Internal error' } }, { status: 500 });

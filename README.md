@@ -38,6 +38,13 @@ This project requires the following environment variables to be set:
 - `RETEL_API_KEY` - Your Retel AI API key for external provider matching
 - `RETEL_API_URL` - (Optional) Custom Retel AI API URL. Defaults to `https://api.retel.ai/v1/providers/search`
 
+### Required for Google Provider Search
+
+- `GOOGLE_CUSTOM_SEARCH_API_KEY` - Your Google Custom Search API key for searching external providers
+- `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` - Your Google Custom Search Engine ID
+
+See the [Google Custom Search Setup Guide](#google-custom-search-setup) below for detailed instructions.
+
 ### Required for WhatsApp Business Integration
 
 - `WHATSAPP_TOKEN` - Your WhatsApp Business API access token
@@ -56,6 +63,8 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 RESEND_API_KEY=your-resend-key
 RETEL_API_KEY=your-retel-key
+GOOGLE_CUSTOM_SEARCH_API_KEY=your-google-api-key
+GOOGLE_CUSTOM_SEARCH_ENGINE_ID=your-search-engine-id
 WHATSAPP_TOKEN=your-whatsapp-token
 WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=your-verify-token
@@ -230,6 +239,172 @@ The application provides two WhatsApp-related endpoints:
 - [Webhook Setup Guide](https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks)
 - [Message Templates](https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates)
 
+## Google Custom Search Setup
+
+This application can search for external service providers using Google's Custom Search API. When a ticket is created, the system will:
+1. Search internal providers in the database
+2. Search external providers via Google based on category and location
+3. Store external provider suggestions in the ticket metadata
+
+**⚠️ Important**: This feature requires a database schema update. See [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md) for migration instructions.
+
+### Prerequisites
+
+1. A Google Cloud Platform account ([create one here](https://console.cloud.google.com/))
+2. Billing enabled on your Google Cloud project (Custom Search API has a free tier)
+
+### Step 1: Enable Google Custom Search API
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Navigate to **APIs & Services** → **Library**
+4. Search for "Custom Search API"
+5. Click on **Custom Search API** and click **Enable**
+
+### Step 2: Create API Credentials
+
+1. Go to **APIs & Services** → **Credentials**
+2. Click **Create Credentials** → **API key**
+3. Copy the generated API key
+4. (Recommended) Click **Restrict key** to add restrictions:
+   - Under "API restrictions", select "Restrict key"
+   - Choose "Custom Search API" from the dropdown
+   - Click **Save**
+5. Add to your environment variables:
+   ```bash
+   GOOGLE_CUSTOM_SEARCH_API_KEY=your-generated-api-key
+   ```
+
+### Step 3: Create a Programmable Search Engine
+
+1. Go to [Programmable Search Engine](https://programmablesearchengine.google.com/)
+2. Click **Get started** or **Add** to create a new search engine
+3. Configure your search engine:
+   - **Sites to search**: Enter `www.google.com` or leave blank to search the entire web
+   - **Name**: e.g., "KeyHomeKey Provider Search"
+   - **Language**: Spanish (or your preferred language)
+4. Click **Create**
+5. After creation, click on your search engine to edit it
+6. Enable **Search the entire web** (if not already enabled)
+7. Copy the **Search engine ID** (looks like: `a1b2c3d4e5f6g7h8i`)
+8. Add to your environment variables:
+   ```bash
+   GOOGLE_CUSTOM_SEARCH_ENGINE_ID=your-search-engine-id
+   ```
+
+### Step 4: Configure Search Parameters (Optional)
+
+To improve search results for Colombian service providers:
+
+1. In your Programmable Search Engine settings, go to **Setup** → **Advanced**
+2. Under **Sites to search**, you can add specific sites:
+   - `paginasamarillas.com.co` - Colombian yellow pages
+   - `olx.com.co` - Classified ads
+   - `locanto.com.co` - Local services
+3. Adjust **SafeSearch** settings as needed
+
+### Step 5: Test Your Integration
+
+1. **Test the API endpoint directly**:
+   ```bash
+   curl -X POST https://your-domain.com/api/providers/google-search \
+     -H "Content-Type: application/json" \
+     -d '{
+       "category": "Plomería",
+       "location": {
+         "department": "Cundinamarca",
+         "municipality": "Bogotá"
+       },
+       "description": "Fuga de agua en cocina"
+     }'
+   ```
+
+2. **Create a ticket and check the response**:
+   - The response will include `externalProviders` array with Google search results
+   - Check your application logs for search queries and results
+
+### Pricing and Limits
+
+**Google Custom Search API Pricing:**
+- **Free tier**: 100 search queries per day
+- **Paid tier**: $5 per 1,000 queries (after free tier)
+- [View detailed pricing](https://developers.google.com/custom-search/v1/overview#pricing)
+
+**Best Practices:**
+- Cache search results when possible
+- Only search when internal providers are not found (optional)
+- Monitor your usage in Google Cloud Console
+
+### API Endpoints
+
+The application provides the following endpoints for provider search:
+
+1. **POST `/api/providers/google-search`** - Search external providers
+   ```typescript
+   {
+     "category": "Plomería",        // Service category
+     "location": {
+       "department": "Cundinamarca",
+       "municipality": "Bogotá"
+     },
+     "description": "Optional description for context"
+   }
+   ```
+   
+   Response:
+   ```typescript
+   {
+     "success": true,
+     "providers": [
+       {
+         "name": "Provider name",
+         "description": "Provider description",
+         "url": "https://provider-website.com",
+         "source": "google",
+         "location": "Bogotá, Cundinamarca"
+       }
+     ],
+     "searchQuery": "plomería en Bogotá Cundinamarca Colombia servicios profesionales"
+   }
+   ```
+
+2. **POST `/api/tickets`** - Create ticket (automatically searches providers)
+   - Searches internal providers first
+   - Then searches external providers via Google
+   - Returns both internal and external provider matches
+   - Stores external providers in ticket metadata
+
+### Troubleshooting
+
+**API returns 403 Forbidden:**
+- Check that Custom Search API is enabled in Google Cloud Console
+- Verify API key restrictions allow Custom Search API
+- Ensure billing is enabled on your Google Cloud project
+
+**No results returned:**
+- Verify Search Engine ID is correct
+- Check that "Search the entire web" is enabled
+- Try different search queries or keywords
+- Review search engine settings in Programmable Search Engine console
+
+**Rate limit exceeded:**
+- You've exceeded the free tier limit (100 queries/day)
+- Consider implementing caching
+- Upgrade to paid tier if needed
+
+**Invalid Search Engine ID:**
+- Ensure you copied the correct Search Engine ID from the Programmable Search Engine console
+- ID should be alphanumeric (no special characters)
+
+### Resources
+
+- [WhatsApp Business Platform Documentation](https://developers.facebook.com/docs/whatsapp)
+- [Cloud API Quick Start](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started)
+- [Webhook Setup Guide](https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks)
+- [Message Templates](https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates)
+- [Google Custom Search API Documentation](https://developers.google.com/custom-search/v1/overview)
+- [Programmable Search Engine](https://programmablesearchengine.google.com/)
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
@@ -251,10 +426,12 @@ When deploying to Vercel, add the following environment variables in your projec
 2. `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 3. `RESEND_API_KEY`
 4. `RETEL_API_KEY`
-5. `WHATSAPP_TOKEN`
-6. `WHATSAPP_PHONE_NUMBER_ID`
-7. `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
-8. `INTERNAL_API_KEY`
+5. `GOOGLE_CUSTOM_SEARCH_API_KEY`
+6. `GOOGLE_CUSTOM_SEARCH_ENGINE_ID`
+7. `WHATSAPP_TOKEN`
+8. `WHATSAPP_PHONE_NUMBER_ID`
+9. `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
+10. `INTERNAL_API_KEY`
 
 **Important for WhatsApp Integration on Vercel:**
 - After deployment, update your webhook URL in the Meta Developer Console to point to your Vercel domain
