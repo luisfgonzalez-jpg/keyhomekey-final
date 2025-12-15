@@ -95,15 +95,23 @@ export async function POST(request: Request) {
           });
 
           // Guardar proveedores externos en el ticket como metadata
+          // Nota: Requiere columna 'external_providers' (JSONB) en la tabla tickets
+          // Ver DATABASE_MIGRATION.md para instrucciones de migración
           if (externalProviders.length > 0 && ticketData) {
-            await supabase
-              .from('tickets')
-              .update({
-                external_providers: externalProviders,
-              })
-              .eq('id', ticketData.id);
-            
-            console.log(`✅ Stored ${externalProviders.length} external providers in ticket metadata`);
+            try {
+              await supabase
+                .from('tickets')
+                .update({
+                  external_providers: externalProviders,
+                })
+                .eq('id', ticketData.id);
+              
+              console.log(`✅ Stored ${externalProviders.length} external providers in ticket metadata`);
+            } catch (updateErr) {
+              // Non-fatal: ticket was created, just couldn't store external providers
+              console.warn('⚠️ Could not store external providers in database. Column may not exist.', updateErr);
+              console.warn('   See DATABASE_MIGRATION.md for migration instructions.');
+            }
           }
         } catch (extErr) {
           console.error('Error searching external providers:', extErr);

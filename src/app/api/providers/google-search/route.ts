@@ -20,7 +20,7 @@ export async function POST(request: Request) {
             message: 'Google Custom Search API is not configured. Please set GOOGLE_CUSTOM_SEARCH_API_KEY and GOOGLE_CUSTOM_SEARCH_ENGINE_ID environment variables.' 
           },
         } as GoogleProviderSearchResponse,
-        { status: 503 }
+        { status: 501 }  // Not Implemented - feature requires configuration
       );
     }
 

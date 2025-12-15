@@ -246,6 +246,8 @@ This application can search for external service providers using Google's Custom
 2. Search external providers via Google based on category and location
 3. Store external provider suggestions in the ticket metadata
 
+**⚠️ Important**: This feature requires a database schema update. See [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md) for migration instructions.
+
 ### Prerequisites
 
 1. A Google Cloud Platform account ([create one here](https://console.cloud.google.com/))

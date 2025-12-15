@@ -12,12 +12,14 @@ import type {
  * @param category - Service category (e.g., "Plomería", "Electricidad")
  * @param municipality - City/municipality name
  * @param department - Department/state name
+ * @param country - Country name (defaults to "Colombia")
  * @returns Formatted search query string
  */
 export function buildProviderSearchQuery(
   category: string,
   municipality: string,
-  department: string
+  department: string,
+  country: string = 'Colombia'
 ): string {
   // Build a query that searches for providers in the specific location
   // Example: "plomería en Bogotá Colombia servicios"
@@ -25,7 +27,7 @@ export function buildProviderSearchQuery(
   const normalizedMunicipality = municipality.trim();
   const normalizedDepartment = department.trim();
   
-  return `${normalizedCategory} en ${normalizedMunicipality} ${normalizedDepartment} Colombia servicios profesionales`;
+  return `${normalizedCategory} en ${normalizedMunicipality} ${normalizedDepartment} ${country} servicios profesionales`;
 }
 
 /**
@@ -39,8 +41,8 @@ export async function searchExternalProviders(
   const apiKey = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
   const searchEngineId = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
 
+  // Silently return empty array if not configured to avoid log noise
   if (!apiKey || !searchEngineId) {
-    console.warn('⚠️ Google Custom Search API not configured. Skipping external provider search.');
     return [];
   }
 
