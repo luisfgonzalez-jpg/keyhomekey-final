@@ -42,7 +42,11 @@ export async function searchExternalProviders(
   const searchEngineId = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
 
   // Silently return empty array if not configured to avoid log noise
+  // Use environment variable GOOGLE_SEARCH_DEBUG=true to see configuration status
   if (!apiKey || !searchEngineId) {
+    if (process.env.GOOGLE_SEARCH_DEBUG === 'true') {
+      console.debug('🔍 Google Custom Search API not configured - skipping external search');
+    }
     return [];
   }
 

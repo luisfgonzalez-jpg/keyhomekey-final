@@ -97,7 +97,7 @@ export async function POST(request: Request) {
           // Guardar proveedores externos en el ticket como metadata
           // Nota: Requiere columna 'external_providers' (JSONB) en la tabla tickets
           // Ver DATABASE_MIGRATION.md para instrucciones de migración
-          if (externalProviders.length > 0 && ticketData) {
+          if (externalProviders.length > 0) {
             try {
               await supabase
                 .from('tickets')
