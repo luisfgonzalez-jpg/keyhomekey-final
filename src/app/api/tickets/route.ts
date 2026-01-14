@@ -2,13 +2,60 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const whatsappToken = process.env.WHATSAPP_TOKEN;
+const whatsappPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const KEYHOME_WHATSAPP = process.env.KEYHOME_WHATSAPP || process.env.KEYHOME_WHATSAPP_NUMBER || '573202292534';
+
+type MediaAttachment = {
+  url: string;
+  type: 'image' | 'video' | 'document';
+  caption?: string;
+  filename?: string;
+};
+
+function normalizePhoneNumber(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (!digits.startsWith('57')) return `57${digits}`;
+  return digits;
+}
+
+async function sendWhatsAppMessage(payload: Record<string, any>) {
+  if (!whatsappToken || !whatsappPhoneNumberId) {
+    console.warn('WhatsApp credentials missing; skipping notification');
+    return;
+  }
+
+  const whatsappApiUrl = `https://graph.facebook.com/v20.0/${whatsappPhoneNumberId}/messages`;
+
+  const resp = await fetch(whatsappApiUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${whatsappToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await resp.json();
+  if (!resp.ok || json.error) {
+    console.error('WhatsApp send error:', json.error || json);
+  }
+}
 
 export async function POST(request: Request) {
   try {
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      return NextResponse.json(
+        { success: false, error: 'Faltan variables de entorno de Supabase (URL o SERVICE_ROLE_KEY).' },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
     const {
       propertyId,
       category,
@@ -40,7 +87,86 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // Aquí puedes agregar lógica de WhatsApp si la tienes
+    // ---------------------------------------------------------------------
+    // Enviar notificación por WhatsApp con texto + adjuntos (si existen)
+    // ---------------------------------------------------------------------
+    try {
+      const normalizedTo = normalizePhoneNumber(KEYHOME_WHATSAPP);
+
+      const message = `Nuevo ticket registrado\n\n` +
+        `Categoría: ${category}\n` +
+        `Prioridad: ${priority}\n` +
+        `Inmueble: ${propertyId}\n` +
+        `Descripción: ${description}\n` +
+        `Reportado por: ${reporter}${reported_by_email ? ` (${reported_by_email})` : ''}`;
+
+      const mediaPayload: MediaAttachment[] = [];
+
+      if (Array.isArray(mediaPaths) && mediaPaths.length > 0) {
+        const signedResults = await Promise.all(
+          mediaPaths.map(async (path: string) => {
+            const { data, error: signedError } = await supabase
+              .storage
+              .from('tickets-media')
+              .createSignedUrl(path, 60 * 60); // 1h
+
+            if (signedError || !data?.signedUrl) {
+              console.error('Error creando URL firmada para WhatsApp', signedError);
+              return null;
+            }
+
+            return data.signedUrl;
+          })
+        );
+
+        signedResults.forEach((signedUrl, index) => {
+          if (!signedUrl) return;
+          const info = mediaInfo?.[index];
+          const mime = info?.type || '';
+          const type: MediaAttachment['type'] = mime.startsWith('video')
+            ? 'video'
+            : mime.startsWith('image')
+            ? 'image'
+            : 'document';
+
+          mediaPayload.push({
+            url: signedUrl,
+            type,
+            caption: info?.name,
+            filename: info?.name,
+          });
+        });
+      }
+
+      // Texto
+      await sendWhatsAppMessage({
+        messaging_product: 'whatsapp',
+        to: normalizedTo,
+        type: 'text',
+        text: { body: message },
+      });
+
+      // Media
+      for (const media of mediaPayload) {
+        const basePayload: Record<string, any> = {
+          messaging_product: 'whatsapp',
+          to: normalizedTo,
+          type: media.type,
+        };
+
+        if (media.type === 'image') {
+          basePayload.image = { link: media.url, caption: media.caption };
+        } else if (media.type === 'video') {
+          basePayload.video = { link: media.url, caption: media.caption };
+        } else {
+          basePayload.document = { link: media.url, caption: media.caption, filename: media.filename };
+        }
+
+        await sendWhatsAppMessage(basePayload);
+      }
+    } catch (notifyError) {
+      console.error('No se pudo enviar WhatsApp:', notifyError);
+    }
 
     return NextResponse.json({ success: true, ticket });
   } catch (error: any) {

@@ -3,9 +3,17 @@ import { NextResponse } from 'next/server';
 // Colombia country code for phone number normalization
 const COLOMBIA_COUNTRY_CODE = '57';
 
+interface MediaAttachment {
+  url: string;
+  type: 'image' | 'video' | 'document';
+  caption?: string;
+  filename?: string; // only used for document
+}
+
 interface WhatsAppNotifyRequest {
   to: string;
-  message: string;
+  message?: string;
+  media?: MediaAttachment[];
 }
 
 interface WhatsAppAPIResponse {
@@ -82,6 +90,26 @@ function normalizePhoneNumber(phone: string): string {
   return digits;
 }
 
+async function sendWhatsAppMessage(
+  whatsappToken: string,
+  whatsappPhoneNumberId: string,
+  payload: Record<string, any>
+) {
+  const whatsappApiUrl = `https://graph.facebook.com/v20.0/${whatsappPhoneNumberId}/messages`;
+
+  const resp = await fetch(whatsappApiUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${whatsappToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await resp.json();
+  return { resp, json };
+}
+
 export async function POST(request: Request) {
   try {
     // 1. Validate authorization (API key or same-origin request)
@@ -106,7 +134,7 @@ export async function POST(request: Request) {
 
     // 3. Parse and validate request body
     const body: WhatsAppNotifyRequest = await request.json();
-    const { to, message } = body;
+    const { to, message, media } = body;
 
     if (!to || typeof to !== 'string') {
       return NextResponse.json(
@@ -115,9 +143,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!message || typeof message !== 'string') {
+    if (!message && (!media || media.length === 0)) {
       return NextResponse.json(
-        { success: false, error: { message: 'Missing or invalid "message" field' } },
+        { success: false, error: { message: 'A "message" or at least one "media" item is required' } },
         { status: 400 }
       );
     }
@@ -125,48 +153,70 @@ export async function POST(request: Request) {
     // 4. Normalize phone number
     const normalizedPhone = normalizePhoneNumber(to);
 
-    // 5. Call WhatsApp Business Cloud API
-    const whatsappApiUrl = `https://graph.facebook.com/v20.0/${whatsappPhoneNumberId}/messages`;
-
-    const whatsappResponse = await fetch(whatsappApiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${whatsappToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    // 5. Send text message first (if provided)
+    if (message) {
+      const textPayload = {
         messaging_product: 'whatsapp',
         to: normalizedPhone,
         type: 'text',
-        text: {
-          body: message,
-        },
-      }),
-    });
+        text: { body: message },
+      };
 
-    const responseData: WhatsAppAPIResponse = await whatsappResponse.json();
+      const { resp, json } = await sendWhatsAppMessage(whatsappToken, whatsappPhoneNumberId, textPayload);
 
-    // 6. Handle WhatsApp API errors
-    if (!whatsappResponse.ok || responseData.error) {
-      console.error('❌ WhatsApp API error:', responseData.error);
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            message: responseData.error?.message || 'WhatsApp API request failed',
-          },
-        },
-        { status: whatsappResponse.status || 500 }
-      );
+      if (!resp.ok || json.error) {
+        console.error('❌ WhatsApp text send error:', json.error);
+        return NextResponse.json(
+          { success: false, error: { message: json.error?.message || 'WhatsApp API request failed' } },
+          { status: resp.status || 500 }
+        );
+      }
+    }
+
+    // 6. Send media messages sequentially (optional)
+    if (media && media.length > 0) {
+      for (const item of media) {
+        if (!item?.url || !item?.type) continue;
+
+        const type = item.type;
+        const basePayload: Record<string, any> = {
+          messaging_product: 'whatsapp',
+          to: normalizedPhone,
+          type,
+        };
+
+        if (type === 'image') {
+          basePayload.image = { link: item.url, caption: item.caption || undefined };
+        } else if (type === 'video') {
+          basePayload.video = { link: item.url, caption: item.caption || undefined };
+        } else if (type === 'document') {
+          basePayload.document = {
+            link: item.url,
+            caption: item.caption || undefined,
+            filename: item.filename || undefined,
+          };
+        } else {
+          continue;
+        }
+
+        const { resp, json } = await sendWhatsAppMessage(whatsappToken, whatsappPhoneNumberId, basePayload);
+
+        if (!resp.ok || json.error) {
+          console.error('❌ WhatsApp media send error:', json.error);
+          return NextResponse.json(
+            { success: false, error: { message: json.error?.message || 'WhatsApp media send failed' } },
+            { status: resp.status || 500 }
+          );
+        }
+      }
     }
 
     // 7. Success response
-    console.log('✅ WhatsApp message sent successfully:', responseData.messages?.[0]?.id);
     return NextResponse.json({
       success: true,
       data: {
-        messageId: responseData.messages?.[0]?.id,
         to: normalizedPhone,
+        mediaSent: media?.length || 0,
       },
     });
   } catch (error: unknown) {
