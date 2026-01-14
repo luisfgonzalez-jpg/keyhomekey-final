@@ -1201,8 +1201,8 @@ export default function HomePage() {
       {tickets.map((t) => {
         const prop = properties.find((p) => p.id === t.property_id);
         
-        // 🔥 NUEVO: Generar URLs públicas para las imágenes
-        const mediaUrls = t.media_urls?.map((path) => {
+        // Generar URLs públicas para las imágenes
+        const mediaUrls = t. media_urls?.map((path) => {
           const { data } = supabase.storage
             .from('tickets-media')
             .getPublicUrl(path);
@@ -1212,59 +1212,62 @@ export default function HomePage() {
         return (
           <div
             key={t.id}
-            className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50 text-xs flex justify-between gap-2"
+            className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50 text-xs"
           >
-            <div className="flex-1">
-              <p className="font-semibold text-slate-900 flex items-center gap-1">
-                <Wrench size={13} />
-                {t.category} ·{' '}
-                <span className="font-normal text-slate-600">
-                  {t.priority}
-                </span>
-              </p>
-              <p className="text-[11px] text-slate-500 line-clamp-2">
-                {t.description}
-              </p>
-              {prop && (
-                <p className="text-[11px] text-slate-400 mt-1">
-                  {prop.address} – {prop.municipality}
+            <div className="flex justify-between gap-2">
+              <div className="flex-1">
+                <p className="font-semibold text-slate-900 flex items-center gap-1">
+                  <Wrench size={13} />
+                  {t.category} ·{' '}
+                  <span className="font-normal text-slate-600">
+                    {t.priority}
+                  </span>
                 </p>
-              )}
-              <p className="text-[11px] text-slate-400 mt-1">
-                Reportado por: {t.reporter}
-              </p>
+                <p className="text-[11px] text-slate-500 line-clamp-2">
+                  {t.description}
+                </p>
+                {prop && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {prop.address} – {prop.municipality}
+                  </p>
+                )}
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Reportado por:  {t.reporter}
+                </p>
+                
+                {/* Mostrar imágenes/videos adjuntos */}
+                {mediaUrls.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {mediaUrls.map((url, idx) => {
+                      const isVideo = url.match(/\.(mp4|mov|quicktime)$/i);
+                      return isVideo ? (
+                        <video
+                          key={idx}
+                          src={url}
+                          controls
+                          className="w-20 h-20 object-cover rounded border border-slate-200"
+                        />
+                      ) : (
+                        <img
+                          key={idx}
+                          src={url}
+                          alt={`Adjunto ${idx + 1}`}
+                          className="w-20 h-20 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => window.open(url, '_blank')}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               
-              {/* 🔥 NUEVO:  Mostrar imágenes/videos adjuntos */}
-              {mediaUrls. length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {mediaUrls.map((url, idx) => {
-                    const isVideo = url.match(/\.(mp4|mov|quicktime)$/i);
-                    return isVideo ? (
-                      <video
-                        key={idx}
-                        src={url}
-                        controls
-                        className="w-20 h-20 object-cover rounded border border-slate-200"
-                      />
-                    ) : (
-                      <img
-                        key={idx}
-                        src={url}
-                        alt={`Adjunto ${idx + 1}`}
-                        className="w-20 h-20 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => window.open(url, '_blank')}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              <StatusBadge status={t.status} />
-              <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
-                <Truck size={11} />
-                Flujo KeyhomeKey
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                <StatusBadge status={t.status} />
+                <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                  <Truck size={11} />
+                  Flujo KeyhomeKey
+                </span>
+              </div>
             </div>
           </div>
         );
