@@ -724,7 +724,7 @@ export default function HomePage() {
           .from('users_profiles')
           .select('*')
           .eq('user_id', session.user.id)
-          .single();
+          .maybeSingle();
         
         if (error) {
           console.error('Error cargando perfil:', error);
@@ -1018,7 +1018,9 @@ export default function HomePage() {
       if (error) throw error;
       
       // Actualizar estado local
-      setProfile({ ...profile, name: profileForm.name, phone: profileForm.phone });
+      if (profile) {
+        setProfile({ ...profile, name: profileForm.name, phone: profileForm.phone });
+      }
       
       setShowEditProfileModal(false);
       alert('✅ Perfil actualizado correctamente');
