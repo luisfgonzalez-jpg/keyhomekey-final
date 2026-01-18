@@ -1576,6 +1576,14 @@ export default function HomePage() {
                         </Button>
                       )}
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar (1/3) - Resumen */}
+          <div className="space-y-6">
             {/* Propiedades */}
             <Card className="p-6">
               <div className="flex items-center justify-between mb-5">
@@ -1624,6 +1632,8 @@ export default function HomePage() {
                 </div>
               )}
             </Card>
+          </div>
+        </div>
 
         {/* PERFIL DE USUARIO */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1674,12 +1684,8 @@ export default function HomePage() {
 
         {/* FORMULARIO TICKET Y LISTA */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Lista de tickets con búsqueda */}
           <Card className="p-5">
-            <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
-              <div className="p-2 bg-[#FEF3C7] rounded-xl">
-                <Wrench size={20} className="text-[#F59E0B]" />
-            {/* Lista de tickets con búsqueda */}
-            <Card className="p-5">
               <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
                 <div className="p-2 bg-[#D1FAE5] rounded-xl">
                   <Calendar size={20} className="text-[#10B981]" />
@@ -1781,7 +1787,6 @@ export default function HomePage() {
                 </div>
               )}
             </Card>
-          </div>
 
           {/* Sidebar (1/3) */}
           <div className="space-y-6">
