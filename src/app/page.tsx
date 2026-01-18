@@ -884,6 +884,10 @@ export default function HomePage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
+  // Estado para modal de recuperación de contraseña
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+
   const [newProp, setNewProp] = useState({
     address: '',
     type: 'Apartamento',
@@ -1146,6 +1150,35 @@ export default function HomePage() {
     setView('login');
     setEmail('');
     setPassword('');
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!resetEmail.trim()) {
+      alert('❌ Por favor ingresa tu email');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim().toLowerCase(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) throw error;
+      
+      setShowForgotPasswordModal(false);
+      setResetEmail('');
+      alert('✅ Te hemos enviado un email con instrucciones para recuperar tu contraseña. Revisa tu bandeja de entrada.');
+      
+    } catch (error: any) {
+      console.error('Error en recuperación de contraseña:', error);
+      alert('❌ Error: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDepartmentChange = (dept: string) => {
@@ -1464,12 +1497,91 @@ export default function HomePage() {
             <Button disabled={loading} type="submit" className="w-full mt-2">
               {loading ? 'Procesando...' : authMode === 'signin' ? 'Entrar' : 'Crear cuenta'}
             </Button>
+
+            {authMode === 'signin' && (
+              <button
+                type="button"
+                onClick={() => setShowForgotPasswordModal(true)}
+                className="w-full text-center text-sm text-[#2563EB] hover:text-[#1D4ED8] mt-3 transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            )}
           </form>
 
           <p className="mt-6 text-[11px] text-slate-400 text-center">
             Al continuar aceptas recibir comunicaciones por correo y WhatsApp relacionadas con la gestión de tus inmuebles.
           </p>
         </Card>
+
+        {/* MODAL: Recuperar Contraseña */}
+        {showForgotPasswordModal && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowForgotPasswordModal(false)}
+          >
+            <Card 
+              className="max-w-md w-full p-6" 
+              onClick={(e: any) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[#1E293B]">🔐 Recuperar Contraseña</h3>
+                <button 
+                  onClick={() => {
+                    setShowForgotPasswordModal(false);
+                    setResetEmail('');
+                  }}
+                  className="text-[#64748B] hover:text-[#1E293B] transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <p className="text-sm text-[#64748B] mb-4">
+                Ingresa tu email y te enviaremos instrucciones para recuperar tu contraseña.
+              </p>
+              
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <Input
+                  label="Email"
+                  icon={Mail}
+                  type="email"
+                  required
+                  value={resetEmail}
+                  onChange={(e: any) => setResetEmail(e.target.value)}
+                  placeholder="tu@email.com"
+                />
+                
+                <div className="flex gap-3 pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowForgotPasswordModal(false);
+                      setResetEmail('');
+                    }}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    variant="primary" 
+                    disabled={loading}
+                    className="flex-1 gap-2"
+                  >
+                    {loading ? 'Enviando...' : (
+                      <>
+                        <Send size={16} />
+                        Enviar
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        )}
       </div>
     );
   }
