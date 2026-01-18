@@ -1202,11 +1202,11 @@ export default function HomePage() {
         const prop = properties.find((p) => p.id === t.property_id);
         
         // Generar URLs públicas para las imágenes
-        const mediaUrls = t. media_urls?.map((path) => {
+        const mediaUrls = t.media_urls?.map((path) => {
           const { data } = supabase.storage
             .from('tickets-media')
             .getPublicUrl(path);
-          return data. publicUrl;
+          return data.publicUrl;
         }) || [];
 
         return (
@@ -1275,6 +1275,8 @@ export default function HomePage() {
     </div>
   )}
 </Card>
+        </div>
+
         {/* FORMULARIO NUEVO INMUEBLE */}
         {userRole === 'OWNER' && (
           <Card id="add-property" className="p-5">
