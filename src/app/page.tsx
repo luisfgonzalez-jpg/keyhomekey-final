@@ -77,6 +77,16 @@ interface Ticket {
 
 type Role = 'OWNER' | 'TENANT' | 'PROVIDER' | null;
 
+interface UserProfile {
+  id?: string;
+  user_id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  created_at?: string;
+}
+
 interface Property {
   id: string;
   owner_id?: string;
@@ -830,6 +840,36 @@ export default function HomePage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
 
+  // Estados para modales
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [showEditTenantModal, setShowEditTenantModal] = useState(false);
+
+  // Estados para formularios
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    phone: '',
+  });
+
+  const [passwordForm, setPasswordForm] = useState({
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  const [tenantForm, setTenantForm] = useState({
+    tenantName: '',
+    tenantEmail: '',
+    tenantPhone: '',
+    contractStart: '',
+    contractEnd: '',
+  });
+
+  // Propiedad seleccionada para editar inquilino
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+
+  // Estado para guardar el perfil completo del usuario
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
   // Metrics state
   const [metrics, setMetrics] = useState({
     totalTickets: 0,
@@ -893,6 +933,37 @@ export default function HomePage() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Cargar perfil del usuario actual
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!session?.user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('users_profiles')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error cargando perfil:', error);
+          return;
+        }
+        
+        if (data) {
+          setProfile(data);
+          setProfileForm({
+            name: data.name || '',
+            phone: data.phone || '',
+          });
+        }
+      } catch (err) {
+        console.error('Error:', err);
+      }
+    };
+    
+    loadProfile();
+  }, [session]);
   // Calcular métricas cuando cambian los tickets
   useEffect(() => {
     if (tickets.length > 0) {
@@ -1177,6 +1248,163 @@ export default function HomePage() {
     }
   };
 
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.user) return;
+    
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase
+        .from('users_profiles')
+        .update({
+          name: profileForm.name.trim(),
+          phone: profileForm.phone.trim(),
+        })
+        .eq('user_id', session.user.id);
+      
+      if (error) throw error;
+      
+      // Actualizar estado local
+      if (profile) {
+        setProfile({ ...profile, name: profileForm.name, phone: profileForm.phone });
+      }
+      
+      setShowEditProfileModal(false);
+      alert('✅ Perfil actualizado correctamente');
+      
+    } catch (error: any) {
+      console.error('Error actualizando perfil:', error);
+      alert('❌ Error: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validar que las contraseñas coincidan
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      alert('❌ Las contraseñas nuevas no coinciden');
+      return;
+    }
+    
+    // Validar longitud mínima
+    if (passwordForm.newPassword.length < 6) {
+      alert('❌ La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      // Actualizar contraseña con Supabase Auth
+      const { error } = await supabase.auth.updateUser({
+        password: passwordForm.newPassword
+      });
+      
+      if (error) throw error;
+      
+      setShowChangePasswordModal(false);
+      setPasswordForm({ newPassword: '', confirmPassword: '' });
+      alert('✅ Contraseña actualizada correctamente');
+      
+    } catch (error: any) {
+      console.error('Error cambiando contraseña:', error);
+      alert('❌ Error: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditTenant = (property: Property) => {
+    setSelectedProperty(property);
+    setTenantForm({
+      tenantName: property.tenant_name || '',
+      tenantEmail: property.tenant_email || '',
+      tenantPhone: property.tenant_phone || '',
+      contractStart: property.contract_start_date || '',
+      contractEnd: property.contract_end_date || '',
+    });
+    setShowEditTenantModal(true);
+  };
+
+  const handleUpdateTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProperty) return;
+    
+    try {
+      setLoading(true);
+      
+      // 1. Actualizar propiedad
+      const { error: propError } = await supabase
+        .from('properties')
+        .update({
+          tenant_name: tenantForm.tenantName.trim(),
+          tenant_email: tenantForm.tenantEmail.trim().toLowerCase(),
+          tenant_phone: tenantForm.tenantPhone.trim(),
+          contract_start_date: tenantForm.contractStart || null,
+          contract_end_date: tenantForm.contractEnd || null,
+        })
+        .eq('id', selectedProperty.id);
+      
+      if (propError) throw propError;
+      
+      // 2. Verificar si el inquilino ya existe en users_profiles
+      const tenantEmail = tenantForm.tenantEmail.trim().toLowerCase();
+      const { data: existingProfile, error: profileCheckError } = await supabase
+        .from('users_profiles')
+        .select('id')
+        .eq('email', tenantEmail)
+        .maybeSingle();
+      
+      // 3. Si no existe, crear perfil de inquilino
+      if (!existingProfile && !profileCheckError) {
+        const { error: profileError } = await supabase
+          .from('users_profiles')
+          .insert([{
+            user_id: null,
+            name: tenantForm.tenantName.trim(),
+            email: tenantEmail,
+            phone: tenantForm.tenantPhone.trim(),
+            role: 'TENANT',
+          }]);
+        
+        if (profileError) {
+          console.error('Error creando perfil inquilino:', profileError);
+          // No lanzamos el error para que la actualización de propiedad se complete
+          // pero informamos al usuario
+          alert('⚠️ Propiedad actualizada, pero hubo un problema al crear el perfil del inquilino');
+        }
+      }
+      
+      // 4. Actualizar estado local
+      setProperties(properties.map(p =>
+        p.id === selectedProperty.id
+          ? {
+              ...p,
+              tenant_name: tenantForm.tenantName,
+              tenant_email: tenantForm.tenantEmail,
+              tenant_phone: tenantForm.tenantPhone,
+              contract_start_date: tenantForm.contractStart,
+              contract_end_date: tenantForm.contractEnd,
+            }
+          : p
+      ));
+      
+      setShowEditTenantModal(false);
+      setSelectedProperty(null);
+      alert('✅ Inquilino actualizado correctamente');
+      
+    } catch (error: any) {
+      console.error('Error actualizando inquilino:', error);
+      alert('❌ Error: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const getRoleLabel = (role: Role) => {
     if (role === 'OWNER') return 'Propietario';
@@ -1319,6 +1547,35 @@ export default function HomePage() {
               <ActivityBarChart tickets={tickets} />
             </div>
 
+            {properties.length === 0 ? (
+              <p className="text-xs text-slate-500">Aún no hay inmuebles registrados.</p>
+            ) : (
+              <div className="space-y-3">
+                {properties.map((p) => (
+                  <div key={p.id} className="flex items-start justify-between border border-slate-100 rounded-xl px-4 py-3 bg-slate-50">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900">{p.address}</p>
+                      <p className="text-xs text-slate-500">{p.municipality}, {p.department} · {p.type}</p>
+                      {p.is_rented && p.tenant_name && (
+                        <p className="text-[11px] text-slate-500 mt-1">Inquilino: {p.tenant_name} ({p.tenant_email})</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="text-[11px] text-slate-500">Tel: {p.owner_phone}</span>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                        <UserCheck size={12} />
+                        {p.is_rented ? 'Arrendado' : 'Disponible'}
+                      </span>
+                      {userRole === 'OWNER' && p.is_rented && (
+                        <Button 
+                          variant="outline" 
+                          className="text-xs h-7 px-2"
+                          onClick={() => handleEditTenant(p)}
+                        >
+                          Cambiar Inquilino
+                        </Button>
+                      )}
+                    </div>
             {/* Propiedades */}
             <Card className="p-6">
               <div className="flex items-center justify-between mb-5">
@@ -1368,6 +1625,59 @@ export default function HomePage() {
               )}
             </Card>
 
+        {/* PERFIL DE USUARIO */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-1 p-5">
+            <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
+              <div className="p-2 bg-[#DBEAFE] rounded-xl">
+                <UserIcon size={20} className="text-[#2563EB]" />
+              </div>
+              Mi Perfil
+            </h3>
+            
+            <div className="space-y-3">
+              <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
+                <p className="text-[11px] text-slate-500 mb-1">Nombre</p>
+                <p className="text-sm font-semibold text-slate-900">{profile?.name || session?.user?.email || 'Usuario'}</p>
+              </div>
+              
+              <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
+                <p className="text-[11px] text-slate-500 mb-1">Email</p>
+                <p className="text-sm text-slate-900">{session?.user?.email}</p>
+              </div>
+              
+              <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
+                <p className="text-[11px] text-slate-500 mb-1">Teléfono</p>
+                <p className="text-sm text-slate-900">{profile?.phone || 'No registrado'}</p>
+              </div>
+              
+              <div className="flex gap-2 mt-4">
+                <Button 
+                  variant="primary" 
+                  className="flex-1 text-xs"
+                  onClick={() => setShowEditProfileModal(true)}
+                >
+                  Editar Perfil
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex-1 text-xs gap-1"
+                  onClick={() => setShowChangePasswordModal(true)}
+                >
+                  <Lock size={14} />
+                  Contraseña
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* FORMULARIO TICKET Y LISTA */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="p-5">
+            <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
+              <div className="p-2 bg-[#FEF3C7] rounded-xl">
+                <Wrench size={20} className="text-[#F59E0B]" />
             {/* Lista de tickets con búsqueda */}
             <Card className="p-5">
               <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
@@ -1750,6 +2060,249 @@ export default function HomePage() {
               </div>
             </form>
           </Card>
+        )}
+
+        {/* MODAL: Editar Perfil */}
+        {showEditProfileModal && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowEditProfileModal(false)}
+          >
+            <Card 
+              className="max-w-md w-full p-6" 
+              onClick={(e: any) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[#1E293B]">✏️ Editar Mi Perfil</h3>
+                <button 
+                  onClick={() => setShowEditProfileModal(false)}
+                  className="text-[#64748B] hover:text-[#1E293B] transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <form onSubmit={handleUpdateProfile} className="space-y-4">
+                <Input
+                  label="Nombre completo"
+                  icon={UserIcon}
+                  type="text"
+                  required
+                  value={profileForm.name}
+                  onChange={(e: any) => setProfileForm({ ...profileForm, name: e.target.value })}
+                  placeholder="Tu nombre completo"
+                />
+                
+                <Input
+                  label="Teléfono (WhatsApp)"
+                  icon={Phone}
+                  type="tel"
+                  required
+                  value={profileForm.phone}
+                  onChange={(e: any) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                  placeholder="+57 300 123 4567"
+                />
+                
+                <div className="flex gap-3 pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowEditProfileModal(false)}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    variant="primary" 
+                    disabled={loading}
+                    className="flex-1"
+                  >
+                    {loading ? 'Guardando...' : '💾 Guardar'}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        )}
+
+        {/* MODAL: Cambiar Contraseña */}
+        {showChangePasswordModal && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowChangePasswordModal(false)}
+          >
+            <Card 
+              className="max-w-md w-full p-6" 
+              onClick={(e: any) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[#1E293B]">🔐 Cambiar Contraseña</h3>
+                <button 
+                  onClick={() => setShowChangePasswordModal(false)}
+                  className="text-[#64748B] hover:text-[#1E293B] transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <Input
+                  label="Nueva contraseña"
+                  icon={Lock}
+                  type="password"
+                  required
+                  value={passwordForm.newPassword}
+                  onChange={(e: any) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  placeholder="Mínimo 6 caracteres"
+                />
+                
+                <Input
+                  label="Confirmar nueva contraseña"
+                  icon={Lock}
+                  type="password"
+                  required
+                  value={passwordForm.confirmPassword}
+                  onChange={(e: any) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  placeholder="Repite la contraseña"
+                />
+                
+                {passwordForm.newPassword && passwordForm.confirmPassword && 
+                 passwordForm.newPassword !== passwordForm.confirmPassword && (
+                  <p className="text-xs text-[#EF4444]">⚠️ Las contraseñas no coinciden</p>
+                )}
+                
+                <div className="flex gap-3 pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowChangePasswordModal(false);
+                      setPasswordForm({ newPassword: '', confirmPassword: '' });
+                    }}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    variant="primary" 
+                    disabled={loading || passwordForm.newPassword !== passwordForm.confirmPassword}
+                    className="flex-1"
+                  >
+                    {loading ? 'Cambiando...' : '🔒 Cambiar'}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        )}
+
+        {/* MODAL: Cambiar Inquilino */}
+        {showEditTenantModal && selectedProperty && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => {
+              setShowEditTenantModal(false);
+              setSelectedProperty(null);
+            }}
+          >
+            <Card 
+              className="max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto" 
+              onClick={(e: any) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-[#1E293B]">👤 Cambiar Inquilino</h3>
+                <button 
+                  onClick={() => {
+                    setShowEditTenantModal(false);
+                    setSelectedProperty(null);
+                  }}
+                  className="text-[#64748B] hover:text-[#1E293B] transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="mb-4 p-3 bg-[#F8FAFC] rounded-xl">
+                <p className="text-xs text-[#64748B] mb-1">Propiedad:</p>
+                <p className="text-sm font-semibold text-[#1E293B]">{selectedProperty.address}</p>
+                <p className="text-xs text-[#64748B]">{selectedProperty.municipality}, {selectedProperty.department}</p>
+              </div>
+              
+              <form onSubmit={handleUpdateTenant} className="space-y-4">
+                <Input
+                  label="Nombre del inquilino"
+                  icon={UserIcon}
+                  type="text"
+                  required
+                  value={tenantForm.tenantName}
+                  onChange={(e: any) => setTenantForm({ ...tenantForm, tenantName: e.target.value })}
+                  placeholder="Nombre completo"
+                />
+                
+                <Input
+                  label="Email del inquilino"
+                  icon={Mail}
+                  type="email"
+                  required
+                  value={tenantForm.tenantEmail}
+                  onChange={(e: any) => setTenantForm({ ...tenantForm, tenantEmail: e.target.value })}
+                  placeholder="correo@ejemplo.com"
+                />
+                
+                <Input
+                  label="Teléfono (WhatsApp)"
+                  icon={Phone}
+                  type="tel"
+                  required
+                  value={tenantForm.tenantPhone}
+                  onChange={(e: any) => setTenantForm({ ...tenantForm, tenantPhone: e.target.value })}
+                  placeholder="+57 300 123 4567"
+                />
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Inicio contrato"
+                    icon={Calendar}
+                    type="date"
+                    value={tenantForm.contractStart}
+                    onChange={(e: any) => setTenantForm({ ...tenantForm, contractStart: e.target.value })}
+                  />
+                  
+                  <Input
+                    label="Fin contrato"
+                    icon={Calendar}
+                    type="date"
+                    value={tenantForm.contractEnd}
+                    onChange={(e: any) => setTenantForm({ ...tenantForm, contractEnd: e.target.value })}
+                  />
+                </div>
+                
+                <div className="flex gap-3 pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowEditTenantModal(false);
+                      setSelectedProperty(null);
+                    }}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    variant="primary" 
+                    disabled={loading}
+                    className="flex-1"
+                  >
+                    {loading ? 'Guardando...' : '💾 Guardar'}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </div>
         )}
       </main>
     </div>
