@@ -27,7 +27,25 @@ import {
   Download,
   Search,
   Filter,
+  Clock,
+  AlertCircle,
+  Star,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
+
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Legend
+} from 'recharts';
 
 const KEYHOME_WHATSAPP = '573202292534';
 
@@ -233,6 +251,199 @@ const StatusBadge = ({ status }: { status: string }) => {
     >
       {status}
     </span>
+  );
+};
+
+const StatsCard = ({ 
+  label, 
+  value, 
+  change, 
+  icon: Icon, 
+  color,
+  trend
+}: {
+  label: string;
+  value: string | number;
+  change?: number;
+  icon: any;
+  color: 'blue' | 'green' | 'yellow' | 'purple';
+  trend?: 'up' | 'down' | 'neutral';
+}) => {
+  const colorClasses = {
+    blue: 'bg-[#DBEAFE] text-[#2563EB]',
+    green: 'bg-[#D1FAE5] text-[#10B981]',
+    yellow: 'bg-[#FEF3C7] text-[#F59E0B]',
+    purple: 'bg-[#EDE9FE] text-[#7C3AED]',
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`p-3 rounded-xl ${colorClasses[color]}`}>
+          <Icon size={24} />
+        </div>
+        {change !== undefined && (
+          <div className="flex items-center gap-1">
+            {trend === 'up' && <TrendingUp size={14} className="text-[#10B981]" />}
+            {trend === 'down' && <TrendingDown size={14} className="text-[#EF4444]" />}
+            <span className={`text-xs font-semibold ${change >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+              {Math.abs(change)}%
+            </span>
+          </div>
+        )}
+      </div>
+      <p className="text-2xl font-bold text-[#1E293B] mb-1">{value}</p>
+      <p className="text-sm text-[#64748B]">{label}</p>
+    </Card>
+  );
+};
+
+const TopProvidersCard = () => {
+  // Datos de ejemplo (hardcoded por ahora)
+  const topProviders = [
+    {
+      id: '1',
+      name: 'José Martínez',
+      specialty: 'Plomería',
+      rating: 4.9,
+      totalJobs: 12,
+      satisfaction: 98,
+    },
+    {
+      id: '2',
+      name: 'Ana García',
+      specialty: 'Electricidad',
+      rating: 4.8,
+      totalJobs: 8,
+      satisfaction: 95,
+    },
+    {
+      id: '3',
+      name: 'Carlos Ruiz',
+      specialty: 'HVAC',
+      rating: 4.6,
+      totalJobs: 15,
+      satisfaction: 92,
+    },
+  ];
+
+  return (
+    <Card className="p-5">
+      <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
+        <div className="p-2 bg-[#FEF3C7] rounded-xl">
+          <Star size={20} className="text-[#F59E0B]" />
+        </div>
+        Top Proveedores
+      </h3>
+      <div className="space-y-3">
+        {topProviders.map((provider, index) => (
+          <div key={provider.id} className="flex items-center justify-between p-3 border border-[#E2E8F0] rounded-xl hover:shadow-md transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2563EB] to-[#7C3AED] flex items-center justify-center text-white font-bold">
+                {index + 1}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[#1E293B]">{provider.name}</p>
+                <p className="text-xs text-[#64748B]">{provider.specialty} · {provider.totalJobs} trabajos</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="flex items-center gap-1 mb-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    size={12}
+                    className={i < Math.floor(provider.rating) ? 'fill-[#F59E0B] text-[#F59E0B]' : 'text-[#E2E8F0]'}
+                  />
+                ))}
+                <span className="text-xs font-semibold text-[#1E293B] ml-1">{provider.rating}</span>
+              </div>
+              <p className="text-xs text-[#64748B]">{provider.satisfaction}% satisfacción</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+};
+
+const TicketsPieChart = ({ tickets }: { tickets: Ticket[] }) => {
+  const pending = tickets.filter(t => t.status === 'Pendiente').length;
+  const inProgress = tickets.filter(t => t.status === 'En progreso').length;
+  const resolved = tickets.filter(t => t.status === 'Resuelto').length;
+  
+  const data = [
+    { name: 'Pendiente', value: pending, color: '#F59E0B' },
+    { name: 'En progreso', value: inProgress, color: '#3B82F6' },
+    { name: 'Resuelto', value: resolved, color: '#10B981' },
+  ].filter(item => item.value > 0); // Solo mostrar si hay datos
+
+  if (data.length === 0) {
+    return (
+      <Card className="p-5">
+        <h3 className="text-lg font-bold text-[#1E293B] mb-4">Tickets por Estado</h3>
+        <div className="h-[250px] flex items-center justify-center text-sm text-[#64748B]">
+          No hay tickets registrados aún
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-5">
+      <h3 className="text-lg font-bold text-[#1E293B] mb-4">Tickets por Estado</h3>
+      <ResponsiveContainer width="100%" height={250}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={90}
+            paddingAngle={5}
+            dataKey="value"
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
+    </Card>
+  );
+};
+
+const ActivityBarChart = ({ tickets }: { tickets: Ticket[] }) => {
+  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const today = new Date();
+  
+  const data = days.map((day, index) => {
+    const date = new Date(today);
+    date.setDate(date.getDate() - (6 - index));
+    
+    const count = tickets.filter(t => {
+      if (!t.created_at) return false;
+      const ticketDate = new Date(t.created_at);
+      return ticketDate.toDateString() === date.toDateString();
+    }).length;
+    
+    return { day, tickets: count };
+  });
+
+  return (
+    <Card className="p-5">
+      <h3 className="text-lg font-bold text-[#1E293B] mb-4">Actividad (Últimos 7 días)</h3>
+      <ResponsiveContainer width="100%" height={250}>
+        <BarChart data={data}>
+          <XAxis dataKey="day" stroke="#64748B" style={{ fontSize: '12px' }} />
+          <YAxis stroke="#64748B" style={{ fontSize: '12px' }} />
+          <Tooltip />
+          <Bar dataKey="tickets" fill="#2563EB" radius={[8, 8, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </Card>
   );
 };
 
@@ -659,6 +870,14 @@ export default function HomePage() {
   // Estado para guardar el perfil completo del usuario
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
+  // Metrics state
+  const [metrics, setMetrics] = useState({
+    totalTickets: 0,
+    avgResponseTime: 0,
+    pendingTickets: 0,
+    resolvedThisMonth: 0
+  });
+
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -745,6 +964,35 @@ export default function HomePage() {
     
     loadProfile();
   }, [session]);
+  // Calcular métricas cuando cambian los tickets
+  useEffect(() => {
+    if (tickets.length > 0) {
+      const pending = tickets.filter(t => t.status === 'Pendiente').length;
+      
+      const now = new Date();
+      const thisMonth = tickets.filter(t => {
+        if (!t.created_at) return false;
+        const created = new Date(t.created_at);
+        return created.getMonth() === now.getMonth() && 
+               created.getFullYear() === now.getFullYear() &&
+               t.status === 'Resuelto';
+      }).length;
+      
+      setMetrics({
+        totalTickets: tickets.length,
+        avgResponseTime: 2.5, // Placeholder - calcular real después
+        pendingTickets: pending,
+        resolvedThisMonth: thisMonth
+      });
+    } else {
+      setMetrics({
+        totalTickets: 0,
+        avgResponseTime: 0,
+        pendingTickets: 0,
+        resolvedThisMonth: 0
+      });
+    }
+  }, [tickets]);
 
   // ---------------------------------------------------------------------------
   // FUNCIONES DE NEGOCIO
@@ -1231,7 +1479,7 @@ export default function HomePage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-[#F8FAFC] font-sans">
       <header className="border-b border-[#E2E8F0] bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -1254,23 +1502,49 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {/* PROPIEDADES Y RESUMEN */}
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* NUEVA SECCIÓN: Métricas Animadas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            label="Total Tickets"
+            value={metrics.totalTickets}
+            change={12}
+            trend="up"
+            icon={FileText}
+            color="blue"
+          />
+          <StatsCard
+            label="Tiempo Promedio"
+            value={`${metrics.avgResponseTime}h`}
+            change={8}
+            trend="down"
+            icon={Clock}
+            color="green"
+          />
+          <StatsCard
+            label="Pendientes"
+            value={metrics.pendingTickets}
+            icon={AlertCircle}
+            color="yellow"
+          />
+          <StatsCard
+            label="Resueltos (mes)"
+            value={metrics.resolvedThisMonth}
+            change={15}
+            trend="up"
+            icon={CheckCircle}
+            color="purple"
+          />
+        </div>
+
+        {/* Grid principal con gráficos y sidebar */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3">
-                <div className="p-2 bg-[#DBEAFE] rounded-xl">
-                  <MapPin size={20} className="text-[#2563EB]" />
-                </div>
-                Mis inmuebles
-              </h3>
-              {userRole === 'OWNER' && (
-                <Button variant="primary" className="text-sm gap-2" onClick={() => document?.getElementById('add-property')?.scrollIntoView({ behavior: 'smooth' })}>
-                  <Plus size={16} />
-                  Agregar inmueble
-                </Button>
-              )}
+          {/* Columna principal (2/3) */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Gráficos */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <TicketsPieChart tickets={tickets} />
+              <ActivityBarChart tickets={tickets} />
             </div>
 
             {properties.length === 0 ? (
@@ -1302,31 +1576,54 @@ export default function HomePage() {
                         </Button>
                       )}
                     </div>
+            {/* Propiedades */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3">
+                  <div className="p-2 bg-[#DBEAFE] rounded-xl">
+                    <MapPin size={20} className="text-[#2563EB]" />
                   </div>
-                ))}
+                  Mis inmuebles
+                </h3>
+                {userRole === 'OWNER' && (
+                  <Button variant="primary" className="text-sm gap-2" onClick={() => document?.getElementById('add-property')?.scrollIntoView({ behavior: 'smooth' })}>
+                    <Plus size={16} />
+                    Agregar inmueble
+                  </Button>
+                )}
               </div>
-            )}
-          </Card>
 
-          <Card className="p-5 space-y-4">
-            <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3">
-              <div className="p-2 bg-[#EDE9FE] rounded-xl">
-                <FileText size={20} className="text-[#7C3AED]" />
-              </div>
-              Resumen
-            </h3>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
-                <p className="text-[11px] text-slate-500 mb-1">Inmuebles activos</p>
-                <p className="text-lg font-semibold text-slate-900">{properties.length}</p>
-              </div>
-              <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
-                <p className="text-[11px] text-slate-500 mb-1">Tickets abiertos</p>
-                <p className="text-lg font-semibold text-slate-900">{tickets.filter((t) => t.status !== 'Resuelto').length}</p>
-              </div>
-            </div>
-          </Card>
-        </div>
+              {properties.length === 0 ? (
+                <p className="text-sm text-[#64748B]">Aún no hay inmuebles registrados.</p>
+              ) : (
+                <div className="space-y-3">
+                  {properties.map((p) => (
+                    <div key={p.id} className="flex items-start justify-between border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white hover:shadow-md transition-shadow">
+                      <div>
+                        <p className="text-sm font-semibold text-[#1E293B]">{p.address}</p>
+                        <p className="text-xs text-[#64748B]">{p.municipality}, {p.department} · {p.type}</p>
+                        {p.is_rented && p.tenant_name && (
+                          <p className="text-xs text-[#64748B] mt-1 flex items-center gap-1">
+                            <UserIcon size={12} />
+                            Inquilino: {p.tenant_name}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <span className={`text-xs px-2 py-1 rounded-full ${p.is_rented ? 'bg-[#D1FAE5] text-[#065F46]' : 'bg-[#F1F5F9] text-[#64748B]'}`}>
+                          {p.is_rented ? 'Arrendado' : 'Disponible'}
+                        </span>
+                        {userRole === 'OWNER' && p.is_rented && (
+                          <Button variant="outline" className="text-xs h-7 px-2">
+                            Cambiar Inquilino
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
 
         {/* PERFIL DE USUARIO */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1381,289 +1678,299 @@ export default function HomePage() {
             <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
               <div className="p-2 bg-[#FEF3C7] rounded-xl">
                 <Wrench size={20} className="text-[#F59E0B]" />
-              </div>
-              Reportar falla (ticket)
-            </h3>
-
-            <form onSubmit={async (e: React.FormEvent) => {
-              e.preventDefault();
-              if (!session?.user) return;
-
-              if (!newTicket.propertyId) {
-                alert('Selecciona un inmueble.');
-                return;
-              }
-
-              try {
-                setLoading(true);
-
-                const property = properties.find((p) => p.id === newTicket.propertyId);
-                if (!property) {
-                  alert('No encontramos el inmueble seleccionado.');
-                  return;
-                }
-
-                const mediaPaths: string[] = [];
-                const mediaInfo: MediaInfo[] = [];
-
-                for (const file of ticketFiles) {
-                  const fileExtension = file.name.split('.').pop() || 'file';
-                  const uniqueName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExtension}`;
-                  const path = `tickets/${newTicket.propertyId}/${uniqueName}`;
-
-                  const { error: uploadError } = await supabase.storage.from('tickets-media').upload(path, file, { cacheControl: '3600', upsert: false });
-
-                  if (uploadError) {
-                    console.error('Error subiendo archivo:', uploadError);
-                    continue;
-                  }
-
-                  mediaPaths.push(path);
-                  mediaInfo.push({ url: path, name: file.name, type: file.type, size: file.size });
-                }
-
-                const payload = {
-                  propertyId: newTicket.propertyId,
-                  category: newTicket.category,
-                  description: newTicket.description,
-                  priority: newTicket.priority,
-                  mediaPaths,
-                  mediaInfo,
-                  reported_by_email: session.user.email ?? '',
-                  reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
-                };
-
-                const resp = await fetch('/api/tickets', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(payload),
-                });
-
-                const result = await resp.json();
-
-                if (!result?.success) {
-                  alert('Error creando ticket en servidor.');
-                  return;
-                }
-
-                setTickets((prev) => [result.ticket as Ticket, ...prev]);
-                setNewTicket({ propertyId: '', category: 'Plomería', description: '', priority: 'Media' });
-                setTicketFiles([]);
-                alert('Ticket creado correctamente.');
-              } catch (err: any) {
-                alert(err.message || 'Error creando el ticket.');
-              } finally {
-                setLoading(false);
-              }
-            }} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-[11px] text-slate-500 mb-1">Inmueble</label>
-                <select
-                  required
-                  value={newTicket.propertyId}
-                  onChange={(e) => setNewTicket((prev) => ({ ...prev, propertyId: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-                >
-                  <option value="">Selecciona un inmueble</option>
-                  {properties.map((p) => (
-                    <option key={p.id} value={p.id}>{p.address} – {p.municipality}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">Categoría</label>
-                  <select
-                    value={newTicket.category}
-                    onChange={(e) => setNewTicket((prev) => ({ ...prev, category: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-                  >
-                    <option>Plomería</option>
-                    <option>Eléctrico</option>
-                    <option>Electrodomésticos</option>
-                    <option>Cerrajería</option>
-                    <option>Otros</option>
-                  </select>
+            {/* Lista de tickets con búsqueda */}
+            <Card className="p-5">
+              <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
+                <div className="p-2 bg-[#D1FAE5] rounded-xl">
+                  <Calendar size={20} className="text-[#10B981]" />
                 </div>
-                <div>
-                  <label className="block text-[11px] text-slate-500 mb-1">Prioridad</label>
-                  <select
-                    value={newTicket.priority}
-                    onChange={(e) => setNewTicket((prev) => ({ ...prev, priority: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-                  >
-                    <option>Alta</option>
-                    <option>Media</option>
-                    <option>Baja</option>
-                  </select>
+                Tickets recientes
+                <span className="text-sm font-normal text-[#64748B]">
+                  ({filteredTickets.length})
+                </span>
+              </h3>
+              
+              {/* Search and Filters */}
+              <div className="mb-4 space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Buscar por descripción o categoría..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 pl-10 text-xs text-[#1E293B] outline-none focus:border-[#2563EB] transition-colors"
+                  />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-slate-500 mb-1">Descripción de la falla</label>
-                <TextArea
-                  icon={MessageCircle}
-                  required
-                  placeholder="Describe qué está pasando, por ejemplo: fuga en el lavamanos del baño principal."
-                  value={newTicket.description}
-                  onChange={(e: any) => setNewTicket((prev) => ({ ...prev, description: e.target.value }))}
-                />
-              </div>
-
-              <FileUploader files={ticketFiles} setFiles={setTicketFiles} />
-
-              <Button disabled={loading} type="submit" className="w-full mt-2 gap-2">
-                {loading ? 'Creando ticket...' : <><Send size={16} />Crear ticket y notificar</>}
-              </Button>
-
-              <p className="text-[11px] text-slate-400 mt-2">
-                Se enviará una notificación por WhatsApp al centro de KeyhomeKey y luego al proveedor adecuado.
-              </p>
-            </form>
-          </Card>
-
-          {/* LISTA DE TICKETS */}
-<Card className="p-5">
-  <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
-    <div className="p-2 bg-[#D1FAE5] rounded-xl">
-      <Calendar size={20} className="text-[#10B981]" />
-    </div>
-    Tickets recientes
-  </h3>
-  
-  {/* Search and Filters */}
-  <div className="mb-4 space-y-3">
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={16} />
-      <input
-        type="text"
-        placeholder="Buscar por descripción o categoría..."
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 pl-10 text-xs text-[#1E293B] outline-none focus:border-[#2563EB] transition-colors"
-      />
-    </div>
-    
-    <div className="grid grid-cols-2 gap-3">
-      <div className="relative">
-        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={14} />
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 pl-9 text-xs text-[#1E293B] outline-none focus:border-[#2563EB] transition-colors"
-        >
-          <option value="all">Todos los estados</option>
-          <option value="Pendiente">Pendiente</option>
-          <option value="En progreso">En progreso</option>
-          <option value="Resuelto">Resuelto</option>
-        </select>
-      </div>
-      
-      <div className="relative">
-        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={14} />
-        <select
-          value={filterPriority}
-          onChange={(e) => setFilterPriority(e.target.value)}
-          className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 pl-9 text-xs text-[#1E293B] outline-none focus:border-[#2563EB] transition-colors"
-        >
-          <option value="all">Todas las prioridades</option>
-          <option value="Alta">Alta</option>
-          <option value="Media">Media</option>
-          <option value="Baja">Baja</option>
-        </select>
-      </div>
-    </div>
-  </div>
-  
-  {filteredTickets.length === 0 ?  (
-    <p className="text-xs text-slate-500">
-      {tickets.length === 0 ? 'Aún no hay tickets registrados.' : 'No se encontraron tickets con los filtros seleccionados.'}
-    </p>
-  ) : (
-    <div className="space-y-3 max-h-[320px] overflow-auto pr-1">
-      {filteredTickets.map((t) => {
-        const prop = properties.find((p) => p.id === t.property_id);
-        
-        // Generar URLs públicas para las imágenes
-        const mediaUrls = t.media_urls?.map((path) => {
-          const { data } = supabase.storage
-            .from('tickets-media')
-            .getPublicUrl(path);
-          return data.publicUrl;
-        }) || [];
-
-        return (
-          <div
-            key={t.id}
-            className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50 text-xs"
-          >
-            <div className="flex justify-between gap-2">
-              <div className="flex-1">
-                <p className="font-semibold text-slate-900 flex items-center gap-1">
-                  <Wrench size={13} />
-                  {t.category} ·{' '}
-                  <span className="font-normal text-slate-600">
-                    {t.priority}
-                  </span>
-                </p>
-                <p className="text-[11px] text-slate-500 line-clamp-2">
-                  {t.description}
-                </p>
-                {prop && (
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {prop.address} – {prop.municipality}
-                  </p>
-                )}
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Reportado por:  {t.reporter}
-                </p>
                 
-                {/* Mostrar imágenes/videos adjuntos */}
-                {mediaUrls.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {mediaUrls.map((url, idx) => {
-                      const isVideo = url.match(/\.(mp4|mov|quicktime)$/i);
-                      return isVideo ? (
-                        <video
-                          key={idx}
-                          src={url}
-                          controls
-                          className="w-20 h-20 object-cover rounded border border-slate-200"
-                        />
-                      ) : (
-                        <img
-                          key={idx}
-                          src={url}
-                          alt={`Adjunto ${idx + 1}`}
-                          className="w-20 h-20 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() => window.open(url, '_blank')}
-                        />
-                      );
-                    })}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="relative">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={14} />
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 pl-9 text-xs text-[#1E293B] outline-none focus:border-[#2563EB] transition-colors"
+                    >
+                      <option value="all">Todos los estados</option>
+                      <option value="Pendiente">Pendiente</option>
+                      <option value="En progreso">En progreso</option>
+                      <option value="Resuelto">Resuelto</option>
+                    </select>
                   </div>
-                )}
+                  
+                  <div className="relative">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={14} />
+                    <select
+                      value={filterPriority}
+                      onChange={(e) => setFilterPriority(e.target.value)}
+                      className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 pl-9 text-xs text-[#1E293B] outline-none focus:border-[#2563EB] transition-colors"
+                    >
+                      <option value="all">Todas las prioridades</option>
+                      <option value="Alta">Alta</option>
+                      <option value="Media">Media</option>
+                      <option value="Baja">Baja</option>
+                    </select>
+                  </div>
+                </div>
               </div>
               
-              <div className="flex flex-col items-end gap-1">
-                <StatusBadge status={t.status} />
-                <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
-                  <Truck size={11} />
-                  Flujo KeyhomeKey
-                </span>
-              </div>
-            </div>
+              {filteredTickets.length === 0 ? (
+                <p className="text-sm text-[#64748B] text-center py-8">
+                  {tickets.length === 0 ? 'Aún no hay tickets registrados.' : 'No se encontraron tickets con los filtros seleccionados.'}
+                </p>
+              ) : (
+                <div className="space-y-3 max-h-[400px] overflow-auto pr-1">
+                  {filteredTickets.map((t) => {
+                    const prop = properties.find((p) => p.id === t.property_id);
+                    
+                    return (
+                      <div
+                        key={t.id}
+                        className="border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white hover:shadow-md transition-all"
+                      >
+                        <div className="flex justify-between gap-3">
+                          <div className="flex-1">
+                            <p className="font-semibold text-[#1E293B] flex items-center gap-2 text-sm mb-1">
+                              <Wrench size={14} />
+                              {t.category}
+                              <span className="font-normal text-xs text-[#64748B]">· {t.priority}</span>
+                            </p>
+                            <p className="text-xs text-[#64748B] line-clamp-2 mb-2">
+                              {t.description}
+                            </p>
+                            {prop && (
+                              <p className="text-xs text-[#94A3B8]">
+                                📍 {prop.address}
+                              </p>
+                            )}
+                            {t.media_urls && t.media_urls.length > 0 && (
+                              <MediaViewer mediaUrls={t.media_urls} mediaInfo={t.media_info} />
+                            )}
+                          </div>
+                          
+                          <div className="flex flex-col items-end gap-1">
+                            <StatusBadge status={t.status} />
+                            <span className="text-xs text-[#94A3B8]">
+                              {t.reporter}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
           </div>
-        );
-      })}
-    </div>
-  )}
-</Card>
+
+          {/* Sidebar (1/3) */}
+          <div className="space-y-6">
+            <TopProvidersCard />
+            
+            {/* Card de perfil simple */}
+            <Card className="p-5">
+              <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
+                <div className="p-2 bg-[#DBEAFE] rounded-xl">
+                  <UserIcon size={20} className="text-[#2563EB]" />
+                </div>
+                Mi Perfil
+              </h3>
+              
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Mail size={16} className="text-[#64748B]" />
+                  <span className="text-sm text-[#1E293B]">{session?.user?.email}</span>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <Home size={16} className="text-[#64748B]" />
+                  <StatusBadge status={getRoleLabel(userRole)} />
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mt-4">
+                <Button variant="primary" className="flex-1 text-xs">
+                  Editar Perfil
+                </Button>
+                <Button variant="outline" className="flex-1 text-xs gap-1">
+                  <Lock size={14} />
+                  Contraseña
+                </Button>
+              </div>
+            </Card>
+
+            {/* Formulario crear ticket */}
+            <Card className="p-5">
+              <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
+                <div className="p-2 bg-[#FEF3C7] rounded-xl">
+                  <Wrench size={20} className="text-[#F59E0B]" />
+                </div>
+                Reportar falla
+              </h3>
+
+              <form onSubmit={async (e: React.FormEvent) => {
+                e.preventDefault();
+                if (!session?.user) return;
+
+                if (!newTicket.propertyId) {
+                  alert('Selecciona un inmueble.');
+                  return;
+                }
+
+                try {
+                  setLoading(true);
+
+                  const property = properties.find((p) => p.id === newTicket.propertyId);
+                  if (!property) {
+                    alert('No encontramos el inmueble seleccionado.');
+                    return;
+                  }
+
+                  const mediaPaths: string[] = [];
+                  const mediaInfo: MediaInfo[] = [];
+
+                  for (const file of ticketFiles) {
+                    const fileExtension = file.name.split('.').pop() || 'file';
+                    const uniqueName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExtension}`;
+                    const path = `tickets/${newTicket.propertyId}/${uniqueName}`;
+
+                    const { error: uploadError } = await supabase.storage.from('tickets-media').upload(path, file, { cacheControl: '3600', upsert: false });
+
+                    if (uploadError) {
+                      console.error('Error subiendo archivo:', uploadError);
+                      continue;
+                    }
+
+                    mediaPaths.push(path);
+                    mediaInfo.push({ url: path, name: file.name, type: file.type, size: file.size });
+                  }
+
+                  const payload = {
+                    propertyId: newTicket.propertyId,
+                    category: newTicket.category,
+                    description: newTicket.description,
+                    priority: newTicket.priority,
+                    mediaPaths,
+                    mediaInfo,
+                    reported_by_email: session.user.email ?? '',
+                    reporter: userRole === 'OWNER' ? 'Propietario' : 'Inquilino',
+                  };
+
+                  const resp = await fetch('/api/tickets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                  });
+
+                  const result = await resp.json();
+
+                  if (!result?.success) {
+                    alert('Error creando ticket en servidor.');
+                    return;
+                  }
+
+                  setTickets((prev) => [result.ticket as Ticket, ...prev]);
+                  setNewTicket({ propertyId: '', category: 'Plomería', description: '', priority: 'Media' });
+                  setTicketFiles([]);
+                  alert('Ticket creado correctamente.');
+                } catch (err: any) {
+                  alert(err.message || 'Error creando el ticket.');
+                } finally {
+                  setLoading(false);
+                }
+              }} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">Inmueble</label>
+                  <select
+                    required
+                    value={newTicket.propertyId}
+                    onChange={(e) => setNewTicket((prev) => ({ ...prev, propertyId: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
+                  >
+                    <option value="">Selecciona un inmueble</option>
+                    {properties.map((p) => (
+                      <option key={p.id} value={p.id}>{p.address} – {p.municipality}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">Categoría</label>
+                    <select
+                      value={newTicket.category}
+                      onChange={(e) => setNewTicket((prev) => ({ ...prev, category: e.target.value }))}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
+                    >
+                      <option>Plomería</option>
+                      <option>Eléctrico</option>
+                      <option>Electrodomésticos</option>
+                      <option>Cerrajería</option>
+                      <option>Otros</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">Prioridad</label>
+                    <select
+                      value={newTicket.priority}
+                      onChange={(e) => setNewTicket((prev) => ({ ...prev, priority: e.target.value }))}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
+                    >
+                      <option>Alta</option>
+                      <option>Media</option>
+                      <option>Baja</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-slate-500 mb-1">Descripción de la falla</label>
+                  <TextArea
+                    icon={MessageCircle}
+                    required
+                    placeholder="Describe qué está pasando, por ejemplo: fuga en el lavamanos del baño principal."
+                    value={newTicket.description}
+                    onChange={(e: any) => setNewTicket((prev) => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+
+                <FileUploader files={ticketFiles} setFiles={setTicketFiles} />
+
+                <Button disabled={loading} type="submit" className="w-full mt-2 gap-2">
+                  {loading ? 'Creando ticket...' : <><Send size={16} />Crear ticket y notificar</>}
+                </Button>
+
+                <p className="text-[11px] text-slate-400 mt-2">
+                  Se enviará una notificación por WhatsApp al centro de KeyhomeKey y luego al proveedor adecuado.
+                </p>
+              </form>
+            </Card>
+          </div>
         </div>
 
-        {/* FORMULARIO NUEVO INMUEBLE */}
+        {/* Formulario agregar propiedad */}
         {userRole === 'OWNER' && (
-          <Card id="add-property" className="p-5">
+          <Card id="add-property" className="p-6">
             <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
               <div className="p-2 bg-[#DBEAFE] rounded-xl">
                 <Plus size={20} className="text-[#2563EB]" />
