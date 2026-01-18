@@ -25,6 +25,8 @@ import {
   X,
   Play,
   Download,
+  Search,
+  Filter,
 } from 'lucide-react';
 
 const KEYHOME_WHATSAPP = '573202292534';
@@ -89,7 +91,7 @@ const Button = ({
   children: React.ReactNode;
   onClick?: () => void;
   type?: 'button' | 'submit';
-  variant?: 'primary' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'outline' | 'ghost' | 'danger' | 'success';
   disabled?: boolean;
   className?: string;
 }) => {
@@ -97,10 +99,11 @@ const Button = ({
     'inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-offset-2';
 
   const variants: Record<string, string> = {
-    primary: 'bg-slate-900 text-white hover:bg-slate-800 focus:ring-slate-900',
-    outline: 'border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 focus:ring-slate-300',
-    ghost: 'text-slate-600 hover:bg-slate-100 focus:ring-slate-200 border border-transparent',
-    danger: 'bg-red-600 text-white hover:bg-red-500 focus:ring-red-600 border border-transparent',
+    primary: 'bg-[#2563EB] text-white hover:bg-[#1D4ED8] focus:ring-[#2563EB] shadow-sm',
+    outline: 'border-2 border-[#2563EB] text-[#2563EB] bg-white hover:bg-[#DBEAFE] focus:ring-[#2563EB]',
+    ghost: 'text-[#2563EB] hover:bg-[#DBEAFE] focus:ring-[#2563EB]',
+    danger: 'bg-[#EF4444] text-white hover:bg-[#DC2626] focus:ring-[#EF4444] shadow-sm',
+    success: 'bg-[#10B981] text-white hover:bg-[#059669] focus:ring-[#10B981] shadow-sm',
   };
 
   return (
@@ -117,7 +120,7 @@ const Button = ({
 
 const Card = ({ children, className = '', ...props }: any) => (
   <div
-    className={`border border-slate-200 rounded-2xl bg-white shadow-sm ${className}`}
+    className={`border border-[#E2E8F0] rounded-2xl bg-white shadow-md hover:shadow-lg transition-shadow duration-200 ${className}`}
     {...props}
   >
     {children}
@@ -126,6 +129,8 @@ const Card = ({ children, className = '', ...props }: any) => (
 
 const Input = ({
   icon: Icon,
+  label,
+  error,
   type = 'text',
   placeholder = '',
   required = false,
@@ -133,63 +138,87 @@ const Input = ({
   onChange = () => {},
   ...props
 }: any) => (
-  <div className="relative">
-    {Icon && (
-      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+  <div className="w-full">
+    {label && (
+      <label className="block text-[11px] font-medium text-[#64748B] mb-1">
+        {label}
+        {required && <span className="text-[#EF4444] ml-1">*</span>}
+      </label>
     )}
-    <input
-      type={type}
-      placeholder={placeholder}
-      required={required}
-      value={value}
-      onChange={onChange}
-      className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400 ${
-        Icon ? 'pl-10' : ''
-      }`}
-      {...props}
-    />
+    <div className="relative">
+      {Icon && (
+        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={16} />
+      )}
+      <input
+        type={type}
+        placeholder={placeholder}
+        required={required}
+        value={value}
+        onChange={onChange}
+        className={`w-full rounded-xl border ${error ? 'border-[#EF4444] focus:border-[#EF4444]' : 'border-[#E2E8F0] focus:border-[#2563EB]'} bg-white px-3 py-2 text-xs text-[#1E293B] outline-none transition-colors ${
+          Icon ? 'pl-10' : ''
+        }`}
+        {...props}
+      />
+    </div>
+    {error && (
+      <p className="text-[10px] text-[#EF4444] mt-1">{error}</p>
+    )}
   </div>
 );
 
 const TextArea = ({
   icon: Icon,
+  label,
+  error,
   placeholder = '',
   required = false,
   value = '',
   onChange = () => {},
   ...props
 }: any) => (
-  <div className="relative">
-    {Icon && <Icon className="absolute left-3 top-3 text-slate-400" size={16} />}
-    <textarea
-      placeholder={placeholder}
-      required={required}
-      value={value}
-      onChange={onChange}
-      className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400 resize-none ${
-        Icon ? 'pl-10' : ''
-      }`}
-      rows={3}
-      {...props}
-    />
+  <div className="w-full">
+    {label && (
+      <label className="block text-[11px] font-medium text-[#64748B] mb-1">
+        {label}
+        {required && <span className="text-[#EF4444] ml-1">*</span>}
+      </label>
+    )}
+    <div className="relative">
+      {Icon && <Icon className="absolute left-3 top-3 text-[#94A3B8]" size={16} />}
+      <textarea
+        placeholder={placeholder}
+        required={required}
+        value={value}
+        onChange={onChange}
+        className={`w-full rounded-xl border ${error ? 'border-[#EF4444] focus:border-[#EF4444]' : 'border-[#E2E8F0] focus:border-[#2563EB]'} bg-white px-3 py-2 text-xs text-[#1E293B] outline-none transition-colors resize-none ${
+          Icon ? 'pl-10' : ''
+        }`}
+        rows={3}
+        {...props}
+      />
+    </div>
+    {error && (
+      <p className="text-[10px] text-[#EF4444] mt-1">{error}</p>
+    )}
   </div>
 );
 
 const StatusBadge = ({ status }: { status: string }) => {
   const colors: Record<string, string> = {
-    Pendiente: 'bg-yellow-100 text-yellow-700',
-    'En progreso': 'bg-blue-100 text-blue-700',
-    Resuelto: 'bg-green-100 text-green-700',
-    Propietario: 'bg-slate-100 text-slate-700',
-    Inquilino: 'bg-slate-100 text-slate-700',
-    Proveedor: 'bg-slate-100 text-slate-700',
-    Usuario: 'bg-slate-100 text-slate-700',
+    Pendiente: 'bg-[#FEF3C7] text-[#92400E] border border-[#FCD34D]',
+    'En progreso': 'bg-[#DBEAFE] text-[#1E40AF] border border-[#60A5FA]',
+    Resuelto: 'bg-[#D1FAE5] text-[#065F46] border border-[#34D399]',
+    Propietario: 'bg-[#EDE9FE] text-[#5B21B6] border border-[#A78BFA]',
+    Inquilino: 'bg-[#DBEAFE] text-[#1E40AF] border border-[#60A5FA]',
+    Proveedor: 'bg-[#D1FAE5] text-[#065F46] border border-[#34D399]',
+    Usuario: 'bg-[#F1F5F9] text-[#475569] border border-[#CBD5E1]',
   };
 
   return (
     <span
       className={`text-[11px] font-semibold px-2 py-1 rounded-full ${
-        colors[status] || 'bg-slate-100 text-slate-700'
+        colors[status] || 'bg-[#F1F5F9] text-[#475569] border border-[#CBD5E1]'
       }`}
     >
       {status}
@@ -585,6 +614,11 @@ export default function HomePage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketFiles, setTicketFiles] = useState<File[]>([]);
 
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<string>('all');
+
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -902,21 +936,33 @@ export default function HomePage() {
     return 'Usuario';
   };
 
+  // Filter tickets based on search and filters
+  const filteredTickets = tickets.filter((ticket) => {
+    const matchesSearch = 
+      ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ticket.category.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = filterStatus === 'all' || ticket.status === filterStatus;
+    const matchesPriority = filterPriority === 'all' || ticket.priority === filterPriority;
+    
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
+
   // ---------------------------------------------------------------------------
   // LOGIN VIEW
   // ---------------------------------------------------------------------------
 
   if (view === 'login') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-gradient-to-b from-[#F8FAFC] to-[#E2E8F0] flex items-center justify-center px-4">
         <Card className="max-w-md w-full p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-10 w-10 rounded-2xl bg-slate-900 flex items-center justify-center">
-              <Home size={22} className="text-white" />
+          <div className="flex items-center gap-4 mb-6">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] flex items-center justify-center shadow-md">
+              <Home size={28} className="text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-slate-900">KeyhomeKey</h1>
-              <p className="text-xs text-slate-500">Propietarios, inquilinos y proveedores en un solo lugar.</p>
+              <h1 className="text-2xl font-bold text-[#1E293B]">KeyHomeKey</h1>
+              <p className="text-sm text-[#64748B]">Propietarios, inquilinos y proveedores en un solo lugar.</p>
             </div>
           </div>
 
@@ -957,22 +1003,22 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-slate-900 flex items-center justify-center">
-              <Home size={20} className="text-white" />
+      <header className="border-b border-[#E2E8F0] bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-[#2563EB] to-[#7C3AED] flex items-center justify-center shadow-md">
+              <Home size={24} className="text-white" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.15em] text-slate-400">Panel {getRoleLabel(userRole).toLowerCase()}</p>
-              <h2 className="text-sm font-semibold text-slate-900">KeyhomeKey</h2>
+              <h1 className="text-2xl font-bold text-[#1E293B] tracking-tight">KeyHomeKey</h1>
+              <p className="text-sm text-[#64748B]">Panel {getRoleLabel(userRole).toLowerCase()}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <StatusBadge status={getRoleLabel(userRole)} />
-            <Button variant="ghost" className="text-xs gap-2" onClick={handleLogout}>
-              <LogOut size={16} />
+            <Button variant="ghost" className="text-sm gap-2" onClick={handleLogout}>
+              <LogOut size={18} />
               Salir
             </Button>
           </div>
@@ -982,15 +1028,17 @@ export default function HomePage() {
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         {/* PROPIEDADES Y RESUMEN */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                <MapPin size={16} />
+          <Card className="lg:col-span-2 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3">
+                <div className="p-2 bg-[#DBEAFE] rounded-xl">
+                  <MapPin size={20} className="text-[#2563EB]" />
+                </div>
                 Mis inmuebles
               </h3>
               {userRole === 'OWNER' && (
-                <Button variant="outline" className="text-xs gap-2" onClick={() => document?.getElementById('add-property')?.scrollIntoView({ behavior: 'smooth' })}>
-                  <Plus size={14} />
+                <Button variant="primary" className="text-sm gap-2" onClick={() => document?.getElementById('add-property')?.scrollIntoView({ behavior: 'smooth' })}>
+                  <Plus size={16} />
                   Agregar inmueble
                 </Button>
               )}
@@ -1023,8 +1071,10 @@ export default function HomePage() {
           </Card>
 
           <Card className="p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <FileText size={16} />
+            <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3">
+              <div className="p-2 bg-[#EDE9FE] rounded-xl">
+                <FileText size={20} className="text-[#7C3AED]" />
+              </div>
               Resumen
             </h3>
             <div className="grid grid-cols-2 gap-3 text-xs">
@@ -1043,8 +1093,10 @@ export default function HomePage() {
         {/* FORMULARIO TICKET Y LISTA */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="p-5">
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
-              <Wrench size={16} />
+            <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
+              <div className="p-2 bg-[#FEF3C7] rounded-xl">
+                <Wrench size={20} className="text-[#F59E0B]" />
+              </div>
               Reportar falla (ticket)
             </h3>
 
@@ -1188,17 +1240,64 @@ export default function HomePage() {
 
           {/* LISTA DE TICKETS */}
 <Card className="p-5">
-  <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
-    <Calendar size={16} />
+  <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
+    <div className="p-2 bg-[#D1FAE5] rounded-xl">
+      <Calendar size={20} className="text-[#10B981]" />
+    </div>
     Tickets recientes
   </h3>
-  {tickets.length === 0 ?  (
+  
+  {/* Search and Filters */}
+  <div className="mb-4 space-y-3">
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={16} />
+      <input
+        type="text"
+        placeholder="Buscar por descripción o categoría..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 pl-10 text-xs text-[#1E293B] outline-none focus:border-[#2563EB] transition-colors"
+      />
+    </div>
+    
+    <div className="grid grid-cols-2 gap-3">
+      <div className="relative">
+        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={14} />
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 pl-9 text-xs text-[#1E293B] outline-none focus:border-[#2563EB] transition-colors"
+        >
+          <option value="all">Todos los estados</option>
+          <option value="Pendiente">Pendiente</option>
+          <option value="En progreso">En progreso</option>
+          <option value="Resuelto">Resuelto</option>
+        </select>
+      </div>
+      
+      <div className="relative">
+        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={14} />
+        <select
+          value={filterPriority}
+          onChange={(e) => setFilterPriority(e.target.value)}
+          className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 pl-9 text-xs text-[#1E293B] outline-none focus:border-[#2563EB] transition-colors"
+        >
+          <option value="all">Todas las prioridades</option>
+          <option value="Alta">Alta</option>
+          <option value="Media">Media</option>
+          <option value="Baja">Baja</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  
+  {filteredTickets.length === 0 ?  (
     <p className="text-xs text-slate-500">
-      Aún no hay tickets registrados. 
+      {tickets.length === 0 ? 'Aún no hay tickets registrados.' : 'No se encontraron tickets con los filtros seleccionados.'}
     </p>
   ) : (
     <div className="space-y-3 max-h-[320px] overflow-auto pr-1">
-      {tickets.map((t) => {
+      {filteredTickets.map((t) => {
         const prop = properties.find((p) => p.id === t.property_id);
         
         // Generar URLs públicas para las imágenes
@@ -1280,8 +1379,10 @@ export default function HomePage() {
         {/* FORMULARIO NUEVO INMUEBLE */}
         {userRole === 'OWNER' && (
           <Card id="add-property" className="p-5">
-            <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-4">
-              <Plus size={16} />
+            <h3 className="text-lg font-bold text-[#1E293B] flex items-center gap-3 mb-4">
+              <div className="p-2 bg-[#DBEAFE] rounded-xl">
+                <Plus size={20} className="text-[#2563EB]" />
+              </div>
               Registrar nuevo inmueble
             </h3>
 
