@@ -59,6 +59,16 @@ interface Ticket {
 
 type Role = 'OWNER' | 'TENANT' | 'PROVIDER' | null;
 
+interface UserProfile {
+  id?: string;
+  user_id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  created_at?: string;
+}
+
 interface Property {
   id: string;
   owner_id?: string;
@@ -631,7 +641,6 @@ export default function HomePage() {
   });
 
   const [passwordForm, setPasswordForm] = useState({
-    current: '',
     newPassword: '',
     confirmPassword: '',
   });
@@ -648,7 +657,7 @@ export default function HomePage() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
 
   // Estado para guardar el perfil completo del usuario
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -1048,7 +1057,7 @@ export default function HomePage() {
       if (error) throw error;
       
       setShowChangePasswordModal(false);
-      setPasswordForm({ current: '', newPassword: '', confirmPassword: '' });
+      setPasswordForm({ newPassword: '', confirmPassword: '' });
       alert('✅ Contraseña actualizada correctamente');
       
     } catch (error: any) {
@@ -1094,14 +1103,14 @@ export default function HomePage() {
       
       // 2. Verificar si el inquilino ya existe en users_profiles
       const tenantEmail = tenantForm.tenantEmail.trim().toLowerCase();
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error: profileCheckError } = await supabase
         .from('users_profiles')
         .select('id')
         .eq('email', tenantEmail)
-        .single();
+        .maybeSingle();
       
       // 3. Si no existe, crear perfil de inquilino
-      if (!existingProfile) {
+      if (!existingProfile && !profileCheckError) {
         const { error: profileError } = await supabase
           .from('users_profiles')
           .insert([{
@@ -1112,7 +1121,12 @@ export default function HomePage() {
             role: 'TENANT',
           }]);
         
-        if (profileError) console.error('Error creando perfil inquilino:', profileError);
+        if (profileError) {
+          console.error('Error creando perfil inquilino:', profileError);
+          // No lanzamos el error para que la actualización de propiedad se complete
+          // pero informamos al usuario
+          alert('⚠️ Propiedad actualizada, pero hubo un problema al crear el perfil del inquilino');
+        }
       }
       
       // 4. Actualizar estado local
@@ -1855,7 +1869,7 @@ export default function HomePage() {
                     variant="outline" 
                     onClick={() => {
                       setShowChangePasswordModal(false);
-                      setPasswordForm({ current: '', newPassword: '', confirmPassword: '' });
+                      setPasswordForm({ newPassword: '', confirmPassword: '' });
                     }}
                     className="flex-1"
                   >
