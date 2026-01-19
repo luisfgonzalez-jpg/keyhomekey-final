@@ -1163,11 +1163,20 @@ export default function HomePage() {
     try {
       setLoading(true);
       
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim().toLowerCase(), {
-        redirectTo: `${window.location.origin}/reset-password`,
+      // Call our custom API endpoint for password reset
+      const response = await fetch('/api/send-password-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: resetEmail.trim().toLowerCase() }),
       });
       
-      if (error) throw error;
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error?.message || 'Error al enviar el email de recuperación');
+      }
       
       setShowForgotPasswordModal(false);
       setResetEmail('');
