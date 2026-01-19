@@ -46,24 +46,10 @@ export async function POST(request: Request) {
       }
     });
 
-    // 4. Check if user exists
-    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (userError) {
-      console.error("❌ Error listing users:", userError);
-      // Don't reveal if user exists for security
-      return NextResponse.json({ success: true });
-    }
+    // 4. Generate password reset link (no need to check user existence first)
+    // Supabase will handle this and we return success regardless to prevent email enumeration
 
-    const userExists = userData.users.some(u => u.email?.toLowerCase() === normalizedEmail);
-    
-    if (!userExists) {
-      console.log(`ℹ️ User not found: ${normalizedEmail}`);
-      // Return success anyway to prevent email enumeration
-      return NextResponse.json({ success: true });
-    }
-
-    // 5. Generate password reset link using Supabase Admin API
+    // Generate password reset link using Supabase Admin API
     const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: normalizedEmail,
@@ -74,19 +60,51 @@ export async function POST(request: Request) {
 
     if (resetError || !resetData.properties?.action_link) {
       console.error("❌ Error generating reset link:", resetError);
-      return NextResponse.json({ 
-        success: false, 
-        error: { message: 'Failed to generate reset link' } 
-      }, { status: 500 });
+      // Return success to prevent email enumeration even on error
+      return NextResponse.json({ success: true });
     }
 
     const resetLink = resetData.properties.action_link;
     console.log("✅ Reset link generated for:", normalizedEmail);
 
-    // 6. Send email via Resend with professional HTML template
+    // 5. Send email via Resend with professional HTML template
     const resend = new Resend(resendApiKey);
-    
-    const htmlContent = `
+    const htmlContent = generatePasswordResetEmailHTML(resetLink);
+
+    const { data: emailData, error: emailError } = await resend.emails.send({
+      from: 'KeyHomeKey <info@keyhomekey.com>',
+      to: [normalizedEmail],
+      subject: '🔐 Recuperación de contraseña - KeyHomeKey',
+      html: htmlContent,
+    });
+
+    if (emailError) {
+      console.error("❌ Error sending email via Resend:", emailError);
+      return NextResponse.json({ 
+        success: false, 
+        error: { message: 'Failed to send recovery email' } 
+      }, { status: 500 });
+    }
+
+    console.log("✅ Password reset email sent successfully:", emailData?.id);
+    return NextResponse.json({ 
+      success: true,
+      message: 'Recovery email sent successfully'
+    });
+
+  } catch (error: unknown) {
+    console.error("❌ Unexpected error in password reset:", error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ 
+      success: false, 
+      error: { message } 
+    }, { status: 500 });
+  }
+}
+
+// Helper function to generate password reset email HTML
+function generatePasswordResetEmailHTML(resetLink: string): string {
+  return `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -194,34 +212,5 @@ export async function POST(request: Request) {
   </table>
 </body>
 </html>
-    `.trim();
-
-    const { data: emailData, error: emailError } = await resend.emails.send({
-      from: 'KeyHomeKey <info@keyhomekey.com>',
-      to: [normalizedEmail],
-      subject: '🔐 Recuperación de contraseña - KeyHomeKey',
-      html: htmlContent,
-    });
-
-    if (emailError) {
-      console.error("❌ Error sending email via Resend:", emailError);
-      return NextResponse.json({ 
-        success: false, 
-        error: { message: 'Failed to send recovery email' } 
-      }, { status: 500 });
-    }
-
-    console.log("✅ Password reset email sent successfully:", emailData?.id);
-    return NextResponse.json({ 
-      success: true,
-      message: 'Recovery email sent successfully'
-    });
-
-  } catch (error: any) {
-    console.error("❌ Unexpected error in password reset:", error);
-    return NextResponse.json({ 
-      success: false, 
-      error: { message: error.message || 'Internal server error' } 
-    }, { status: 500 });
-  }
+  `.trim();
 }
