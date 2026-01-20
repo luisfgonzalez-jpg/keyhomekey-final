@@ -956,7 +956,7 @@ export default function HomePage() {
           }
         } catch (error) {
           // If parsing fails, ignore and continue normal flow
-          console.error('Error parsing URL hash:', error);
+          console.error('Error parsing URL hash:', hash, error);
         }
       }
     }
