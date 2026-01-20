@@ -950,7 +950,8 @@ export default function HomePage() {
         try {
           // Parse hash as URLSearchParams for robust token detection
           const params = new URLSearchParams(hash.slice(1));
-          if (params.get('type') === 'recovery') {
+          // Only redirect if this is a valid Supabase recovery token
+          if (params.get('type') === 'recovery' && params.get('access_token')) {
             // Redirect to reset-password page with the hash preserved
             router.push(`/reset-password${hash}`);
           }
