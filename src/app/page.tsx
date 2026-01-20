@@ -941,6 +941,9 @@ export default function HomePage() {
 
   // Auto-redirect for password recovery tokens
   useEffect(() => {
+    // Only redirect if we're on the login view to prevent loops
+    if (view !== 'login') return;
+    
     // Check if there's a recovery token in the URL hash
     if (typeof window !== 'undefined') {
       const hash = window.location.hash;
@@ -957,11 +960,12 @@ export default function HomePage() {
           }
         } catch (error) {
           // If parsing fails, ignore and continue normal flow
-          console.error('Error parsing URL hash:', hash, error);
+          // Don't log the hash as it may contain sensitive tokens
+          console.error('Error parsing URL hash for recovery token');
         }
       }
     }
-  }, [router]);
+  }, [router, view]);
 
   // Cargar perfil del usuario actual
   useEffect(() => {
