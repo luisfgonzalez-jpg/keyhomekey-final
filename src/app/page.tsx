@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { colombiaLocations } from '@/lib/colombiaData';
 
@@ -826,6 +827,7 @@ const FileUploader = ({
 // -----------------------------------------------------------------------------
 
 export default function HomePage() {
+  const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<Role>(null);
   const [view, setView] = useState<'login' | 'dashboard'>('login');
@@ -936,6 +938,21 @@ export default function HomePage() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Auto-redirect for password recovery tokens
+  useEffect(() => {
+    // Check if there's a recovery token in the URL hash
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      
+      // Check if hash contains type=recovery (password recovery token)
+      if (hash && hash.includes('type=recovery')) {
+        console.log('🔐 Recovery token detected, redirecting to /reset-password');
+        // Redirect to reset-password page with the hash preserved
+        router.push(`/reset-password${hash}`);
+      }
+    }
+  }, [router]);
 
   // Cargar perfil del usuario actual
   useEffect(() => {
