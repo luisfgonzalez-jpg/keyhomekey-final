@@ -372,22 +372,14 @@ const TicketsPieChart = ({ tickets }: { tickets: Ticket[] }) => {
   const pending = tickets.filter(t => t.status === 'Pendiente').length;
   const inProgress = tickets.filter(t => t.status === 'En progreso').length;
   const resolved = tickets.filter(t => t.status === 'Resuelto').length;
+// Auto-redirect recovery tokens to reset-password page
+useEffect(() => {
+  if (typeof window === 'undefined') return;
   
-  const data = [
-    { name: 'Pendiente', value: pending, color: '#F59E0B' },
-    { name: 'En progreso', value: inProgress, color: '#3B82F6' },
-    { name: 'Resuelto', value: resolved, color: '#10B981' },
-  ].filter(item => item.value > 0); // Solo mostrar si hay datos
-
-  if (data.length === 0) {
-    return (
-      <Card className="p-5">
-        <h3 className="text-lg font-bold text-[#1E293B] mb-4">Tickets por Estado</h3>
-        <div className="h-[250px] flex items-center justify-center text-sm text-[#64748B]">
-          No hay tickets registrados aún
-        </div>
-      </Card>
-    );
+  const hash = window.location.hash;
+  if (hash.includes('type=recovery') && hash.includes('access_token')) {
+    console.log('🔐 Token de recuperación detectado, redirigiendo...');
+    window.location.href = `/reset-password${hash}`;
   }
 
   return (
@@ -2464,3 +2456,4 @@ export default function HomePage() {
     </div>
   );
 }
+}, []);
