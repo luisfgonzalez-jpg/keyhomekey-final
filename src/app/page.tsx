@@ -946,10 +946,18 @@ export default function HomePage() {
       const hash = window.location.hash;
       
       // Check if hash contains type=recovery (password recovery token)
-      if (hash && hash.includes('type=recovery')) {
-        console.log('🔐 Recovery token detected, redirecting to /reset-password');
-        // Redirect to reset-password page with the hash preserved
-        router.push(`/reset-password${hash}`);
+      if (hash) {
+        try {
+          // Parse hash as URLSearchParams for robust token detection
+          const params = new URLSearchParams(hash.slice(1));
+          if (params.get('type') === 'recovery') {
+            // Redirect to reset-password page with the hash preserved
+            router.push(`/reset-password${hash}`);
+          }
+        } catch (error) {
+          // If parsing fails, ignore and continue normal flow
+          console.error('Error parsing URL hash:', error);
+        }
       }
     }
   }, [router]);
