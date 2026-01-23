@@ -29,6 +29,7 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Cargar comentarios iniciales
   useEffect(() => {
@@ -101,7 +102,8 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
 
     for (const file of files) {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
+      // Use crypto.randomUUID() for secure unique file names
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
       const filePath = `${ticketId}/${fileName}`;
 
       const { error } = await supabase.storage
@@ -130,6 +132,7 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
 
     setLoading(true);
     setUploading(selectedFiles.length > 0);
+    setError(null);
 
     try {
       let media_urls: string[] = [];
@@ -158,12 +161,13 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
         setNewComment('');
         setSelectedFiles([]);
         setPreviewUrls([]);
+        setError(null);
       } else {
-        alert('Error al agregar comentario: ' + data.error);
+        setError(data.error || 'Error al agregar comentario');
       }
     } catch (error) {
       console.error('Error submitting comment:', error);
-      alert('Error al agregar comentario');
+      setError('Error al agregar comentario. Por favor, intenta de nuevo.');
     } finally {
       setLoading(false);
       setUploading(false);
@@ -233,6 +237,21 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
         {/* Form for new comment */}
         <div className="border-b border-gray-200 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Error message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-2">
+                <X className="w-5 h-5" />
+                <p className="flex-1">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="text-red-600 hover:text-red-800"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             <div>
               <textarea
                 value={newComment}

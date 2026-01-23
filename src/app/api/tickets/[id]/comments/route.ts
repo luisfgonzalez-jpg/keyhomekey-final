@@ -102,21 +102,30 @@ export async function POST(
       .single();
 
     if (ticket) {
+      // Función para crear el mensaje de notificación
+      const createNotificationMessage = (role: string) => {
+        return `💬 Nuevo comentario en ticket #${ticketId.substring(0, 8)}\nDe: ${profile.name} (${role})\n"${comment_text}"\n\nVer ticket: ${process.env.NEXT_PUBLIC_SITE_URL || ''}/tickets/${ticketId}`;
+      };
+
+      // Base URL para las notificaciones
+      const notifyApiUrl = `${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/whatsapp/notify`;
+      const apiHeaders = {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.INTERNAL_API_KEY || ''
+      };
+
       // Enviar notificaciones WhatsApp (solo a quienes NO escribieron el comentario)
       const notifications = [];
       
       // Notificar al proveedor si existe y no es quien comentó
       if (ticket.assigned_provider_id && profile.role !== 'PROVIDER' && ticket.providers?.phone) {
         notifications.push(
-          fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/whatsapp/notify`, {
+          fetch(notifyApiUrl, {
             method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-api-key': process.env.INTERNAL_API_KEY || ''
-            },
+            headers: apiHeaders,
             body: JSON.stringify({
               to: ticket.providers.phone,
-              message: `💬 Nuevo comentario en ticket #${ticketId.substring(0, 8)}\nDe: ${profile.name} (${profile.role})\n"${comment_text}"\n\nVer ticket: ${process.env.NEXT_PUBLIC_SITE_URL || ''}/tickets/${ticketId}`
+              message: createNotificationMessage(profile.role)
             })
           })
         );
@@ -125,15 +134,12 @@ export async function POST(
       // Notificar al inquilino si no es quien comentó
       if (profile.role !== 'TENANT' && ticket.properties?.tenant_phone) {
         notifications.push(
-          fetch(`${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/whatsapp/notify`, {
+          fetch(notifyApiUrl, {
             method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-api-key': process.env.INTERNAL_API_KEY || ''
-            },
+            headers: apiHeaders,
             body: JSON.stringify({
               to: ticket.properties.tenant_phone,
-              message: `💬 Nuevo comentario en ticket #${ticketId.substring(0, 8)}\nDe: ${profile.name} (${profile.role})\n"${comment_text}"\n\nVer ticket: ${process.env.NEXT_PUBLIC_SITE_URL || ''}/tickets/${ticketId}`
+              message: createNotificationMessage(profile.role)
             })
           })
         );
