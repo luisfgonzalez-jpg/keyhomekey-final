@@ -908,6 +908,21 @@ export default function HomePage() {
   });
 
   // ---------------------------------------------------------------------------
+  // KEYBOARD ACCESSIBILITY FOR MODAL
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showTicketDetailModal) {
+        setShowTicketDetailModal(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showTicketDetailModal]);
+
+  // ---------------------------------------------------------------------------
   // INICIALIZACIÓN
   // ---------------------------------------------------------------------------
 
@@ -1902,6 +1917,16 @@ export default function HomePage() {
                           setSelectedTicket(t);
                           setShowTicketDetailModal(true);
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedTicket(t);
+                            setShowTicketDetailModal(true);
+                          }
+                        }}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Ver detalles del ticket: ${t.category}`}
                       >
                         <div className="flex justify-between gap-3">
                           <div className="flex-1">
