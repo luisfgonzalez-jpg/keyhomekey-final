@@ -5,6 +5,7 @@ import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { colombiaLocations } from '@/lib/colombiaData';
+import TicketTimeline from '@/components/TicketTimeline';
 
 import {
   Home,
@@ -830,6 +831,10 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+
+  // Ticket detail modal states
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [showTicketDetailModal, setShowTicketDetailModal] = useState(false);
 
   // Estados para modales
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -1892,7 +1897,11 @@ export default function HomePage() {
                     return (
                       <div
                         key={t.id}
-                        className="border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white hover:shadow-md transition-all"
+                        className="border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white hover:shadow-md transition-all cursor-pointer"
+                        onClick={() => {
+                          setSelectedTicket(t);
+                          setShowTicketDetailModal(true);
+                        }}
                       >
                         <div className="flex justify-between gap-3">
                           <div className="flex-1">
@@ -2450,6 +2459,102 @@ export default function HomePage() {
           </div>
         )}
       </main>
+
+      {/* MODAL: Ticket Detail with Timeline */}
+      {showTicketDetailModal && selectedTicket && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowTicketDetailModal(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-[#1E293B]">
+                  Ticket #{selectedTicket.id.substring(0, 8)}
+                </h2>
+                <div className="flex items-center gap-3 mt-2">
+                  <StatusBadge status={selectedTicket.status} />
+                  <span className="text-sm text-[#64748B]">
+                    {selectedTicket.category} · {selectedTicket.priority}
+                  </span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowTicketDetailModal(false)}
+                className="text-[#64748B] hover:text-[#1E293B] transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Description */}
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-[#64748B] mb-2">Descripción</h3>
+              <p className="text-sm text-[#1E293B] whitespace-pre-wrap">{selectedTicket.description}</p>
+            </div>
+
+            {/* Property Info */}
+            {(() => {
+              const prop = properties.find(p => p.id === selectedTicket.property_id);
+              return prop ? (
+                <div className="mb-6 p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                  <h3 className="text-sm font-semibold text-[#64748B] mb-2">Propiedad</h3>
+                  <p className="text-sm font-semibold text-[#1E293B] flex items-center gap-2">
+                    <MapPin size={16} />
+                    {prop.address}
+                  </p>
+                  <p className="text-xs text-[#64748B] mt-1">
+                    {prop.municipality}, {prop.department} · {prop.type}
+                  </p>
+                </div>
+              ) : null;
+            })()}
+
+            {/* Existing Media */}
+            {selectedTicket.media_urls && selectedTicket.media_urls.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-[#64748B] mb-3">Archivos del Reporte Inicial</h3>
+                <MediaViewer 
+                  mediaUrls={selectedTicket.media_urls} 
+                  mediaInfo={selectedTicket.media_info} 
+                />
+              </div>
+            )}
+
+            {/* Ticket Info Grid */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="p-3 bg-[#F8FAFC] rounded-xl">
+                <p className="text-xs text-[#64748B] mb-1">Reportado por</p>
+                <p className="text-sm font-semibold text-[#1E293B]">{selectedTicket.reporter}</p>
+                <p className="text-xs text-[#64748B]">{selectedTicket.reported_by_email}</p>
+              </div>
+              <div className="p-3 bg-[#F8FAFC] rounded-xl">
+                <p className="text-xs text-[#64748B] mb-1">Fecha de creación</p>
+                <p className="text-sm font-semibold text-[#1E293B]">
+                  {selectedTicket.created_at 
+                    ? new Date(selectedTicket.created_at).toLocaleDateString('es-CO', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    : 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            {/* Timeline Section */}
+            <div className="border-t border-[#E2E8F0] pt-6">
+              <TicketTimeline ticketId={selectedTicket.id} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
