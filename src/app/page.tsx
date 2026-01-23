@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
@@ -908,19 +908,13 @@ export default function HomePage() {
   });
 
   // ---------------------------------------------------------------------------
-  // KEYBOARD ACCESSIBILITY FOR MODAL
+  // MEMOIZED VALUES
   // ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && showTicketDetailModal) {
-        handleCloseTicketModal();
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [showTicketDetailModal]);
+  const ticketProperty = useMemo(() => {
+    if (!selectedTicket) return null;
+    return properties.find(p => p.id === selectedTicket.property_id) || null;
+  }, [selectedTicket, properties]);
 
   // ---------------------------------------------------------------------------
   // INICIALIZACIÓN
@@ -1191,10 +1185,22 @@ export default function HomePage() {
     setPassword('');
   };
 
-  const handleCloseTicketModal = () => {
+  const handleCloseTicketModal = useCallback(() => {
     setShowTicketDetailModal(false);
     setSelectedTicket(null);
-  };
+  }, []);
+
+  // Keyboard accessibility for ticket modal
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showTicketDetailModal) {
+        handleCloseTicketModal();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showTicketDetailModal, handleCloseTicketModal]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2528,21 +2534,18 @@ export default function HomePage() {
             </div>
 
             {/* Property Info */}
-            {(() => {
-              const prop = properties.find(p => p.id === selectedTicket.property_id);
-              return prop ? (
-                <div className="mb-6 p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-                  <h3 className="text-sm font-semibold text-[#64748B] mb-2">Propiedad</h3>
-                  <p className="text-sm font-semibold text-[#1E293B] flex items-center gap-2">
-                    <MapPin size={16} />
-                    {prop.address}
-                  </p>
-                  <p className="text-xs text-[#64748B] mt-1">
-                    {prop.municipality}, {prop.department} · {prop.type}
-                  </p>
-                </div>
-              ) : null;
-            })()}
+            {ticketProperty && (
+              <div className="mb-6 p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                <h3 className="text-sm font-semibold text-[#64748B] mb-2">Propiedad</h3>
+                <p className="text-sm font-semibold text-[#1E293B] flex items-center gap-2">
+                  <MapPin size={16} />
+                  {ticketProperty.address}
+                </p>
+                <p className="text-xs text-[#64748B] mt-1">
+                  {ticketProperty.municipality}, {ticketProperty.department} · {ticketProperty.type}
+                </p>
+              </div>
+            )}
 
             {/* Existing Media */}
             {selectedTicket.media_urls && selectedTicket.media_urls.length > 0 && (
