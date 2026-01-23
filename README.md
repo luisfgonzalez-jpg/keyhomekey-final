@@ -230,6 +230,71 @@ The application provides two WhatsApp-related endpoints:
 - [Webhook Setup Guide](https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks)
 - [Message Templates](https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates)
 
+## Ticket Comments and Activity Timeline
+
+This application includes a complete ticket comment system with real-time updates and WhatsApp notifications.
+
+### Features
+
+- **Real-time Updates**: Comments appear instantly using Supabase Realtime
+- **File Attachments**: Upload images, videos, and documents with each comment
+- **WhatsApp Notifications**: Automatic notifications sent to relevant parties when new comments are added
+- **Role-based Display**: Comments show user avatars and role badges (Owner, Tenant, Provider)
+- **Timeline View**: Chronological display of all activity with relative timestamps
+
+### Database Setup
+
+1. Apply the database migration to create the `ticket_comments` table:
+
+```bash
+# If using Supabase CLI
+supabase db push
+
+# Or apply manually in Supabase SQL Editor
+# Run the SQL in: supabase/migrations/20260123000000_add_ticket_comments.sql
+```
+
+2. Ensure you have a storage bucket named `tickets-media` in Supabase for file uploads
+
+### Usage in Your Application
+
+Import and use the `TicketTimeline` component on your ticket detail pages:
+
+```tsx
+import TicketTimeline from '@/components/TicketTimeline';
+
+// Inside your ticket detail component
+<TicketTimeline ticketId={ticket.id} />
+```
+
+### API Endpoints
+
+**GET `/api/tickets/[id]/comments`**
+- Fetches all comments for a specific ticket
+- Respects Row Level Security (RLS) policies
+- Returns comments in reverse chronological order
+
+**POST `/api/tickets/[id]/comments`**
+- Creates a new comment on a ticket
+- Accepts optional `media_urls` array for file attachments
+- Automatically sends WhatsApp notifications to ticket participants (excluding comment author)
+- Returns the created comment
+
+Request body:
+```json
+{
+  "comment_text": "Your comment text",
+  "media_urls": ["url1", "url2"],  // optional
+  "comment_type": "comment"  // or 'status_change', 'provider_assigned', 'media_added'
+}
+```
+
+### Security
+
+- **Row Level Security (RLS)**: Only users associated with a ticket can view/add comments
+- **Authentication Required**: All endpoints require valid Supabase authentication
+- **Secure File Storage**: Files are uploaded to Supabase storage with unique UUIDs
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
