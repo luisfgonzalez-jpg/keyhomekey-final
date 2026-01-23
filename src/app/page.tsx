@@ -914,7 +914,7 @@ export default function HomePage() {
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && showTicketDetailModal) {
-        setShowTicketDetailModal(false);
+        handleCloseTicketModal();
       }
     };
 
@@ -1189,6 +1189,11 @@ export default function HomePage() {
     setView('login');
     setEmail('');
     setPassword('');
+  };
+
+  const handleCloseTicketModal = () => {
+    setShowTicketDetailModal(false);
+    setSelectedTicket(null);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -2489,7 +2494,7 @@ export default function HomePage() {
       {showTicketDetailModal && selectedTicket && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowTicketDetailModal(false)}
+          onClick={handleCloseTicketModal}
         >
           <div 
             className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6"
@@ -2509,7 +2514,7 @@ export default function HomePage() {
                 </div>
               </div>
               <button 
-                onClick={() => setShowTicketDetailModal(false)}
+                onClick={handleCloseTicketModal}
                 className="text-[#64748B] hover:text-[#1E293B] transition-colors"
               >
                 <X size={24} />
