@@ -15,10 +15,13 @@ export function createClient() {
         const cookie = document.cookie
           .split('; ')
           .find(row => row.startsWith(`${name}=`));
-        return cookie ? cookie.split('=')[1] : null;
+        if (!cookie) return null;
+        const value = cookie.substring(name.length + 1);
+        return decodeURIComponent(value);
       },
       set(name: string, value: string, options: CookieOptions) {
-        let cookieString = `${name}=${value}; path=/; SameSite=Lax`;
+        const encodedValue = encodeURIComponent(value);
+        let cookieString = `${name}=${encodedValue}; path=/; SameSite=Lax`;
         
         if (options.maxAge) {
           cookieString += `; max-age=${options.maxAge}`;
@@ -35,7 +38,8 @@ export function createClient() {
         document.cookie = cookieString;
       },
       remove(name: string, options: CookieOptions) {
-        let cookieString = `${name}=; path=/; max-age=0`;
+        const path = options.path || '/';
+        let cookieString = `${name}=; path=${path}; max-age=0`;
         
         if (options.domain) {
           cookieString += `; domain=${options.domain}`;
