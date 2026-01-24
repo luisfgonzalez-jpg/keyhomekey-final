@@ -38,7 +38,9 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
   useEffect(() => {
     const fetchComments = async () => {
       try {
-        const response = await fetch(`/api/tickets/${ticketId}/comments`);
+        const response = await fetch(`/api/tickets/${ticketId}/comments`, {
+          credentials: 'same-origin'
+        });
         const data = await response.json();
         
         if (data.success) {
@@ -148,6 +150,7 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
       // Create comment
       const response = await fetch(`/api/tickets/${ticketId}/comments`, {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
         },
