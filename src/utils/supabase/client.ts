@@ -1,16 +1,23 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { CookieOptions } from '@supabase/ssr'
+import { SUPABASE_CONFIG_VERSION } from './version'
 
 /**
- * Creates a Supabase browser client configured to use cookie-based session storage.
+ * Supabase browser client factory with cookie-based session storage
+ * @version 2.0.0 - Cookie storage implementation
+ */
+export const SUPABASE_CLIENT_VERSION = '2.0.0';
+
+/**
+ * Creates browser Supabase client with cookie storage (NOT localStorage)
  * 
  * This client stores authentication sessions in HTTP cookies instead of localStorage,
  * enabling proper server-side authentication via cookies sent with fetch requests.
  * 
  * @returns Configured Supabase browser client with cookie storage
- * @version 2.0.0 - Cookie-based storage (PR #28)
+ * @version 2.0.0 - Cookie-based storage (PR #30)
  */
-export function createClient() {
+export function createBrowserSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -60,5 +67,9 @@ export function createClient() {
   });
 }
 
-// Force build cache invalidation - PR #29
-// This ensures Next.js regenerates the bundle with cookie configuration
+// Backward compatibility alias (temporary)
+export const createClient = createBrowserSupabaseClient;
+
+// Force build cache invalidation - PR #30
+// Module restructured with new exports to force Next.js complete rebuild
+// Version: ${SUPABASE_CONFIG_VERSION}

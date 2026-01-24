@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { createBrowserSupabaseClient as createClient } from '@/utils/supabase/client';
 import { MessageCircle, Upload, Send, Image as ImageIcon, X, Clock } from 'lucide-react';
 import Image from 'next/image';
 
