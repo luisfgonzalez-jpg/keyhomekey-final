@@ -6,13 +6,24 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const { id: ticketId } = await params;
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Read token from Authorization header
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
+    }
+
+    const supabase = await createClient();
+    
+    // Validate token with Supabase
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.error('Auth error:', authError);
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
     }
 
     // Obtener comentarios con verificación de acceso (RLS se encarga)
@@ -40,15 +51,26 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const { id: ticketId } = await params;
     const body = await request.json();
     const { comment_text, media_urls = [], comment_type = 'comment' } = body;
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Read token from Authorization header
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
+    }
+
+    const supabase = await createClient();
+    
+    // Validate token with Supabase
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.error('Auth error:', authError);
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
     }
 
     // Obtener info del usuario
