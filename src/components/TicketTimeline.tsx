@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/utils/supabase/client';
 import { MessageCircle, Upload, Send, Image as ImageIcon, X, Clock } from 'lucide-react';
 import Image from 'next/image';
 
@@ -23,6 +23,9 @@ interface TicketTimelineProps {
 }
 
 export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
+  // Initialize Supabase client with user session
+  const supabase = createClient();
+  
   const [comments, setComments] = useState<Comment[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -163,7 +166,8 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
         setPreviewUrls([]);
         setError(null);
       } else {
-        setError(data.error || 'Error al agregar comentario');
+        console.error('Error creating comment:', data.error);
+        setError(`Error al agregar comentario: ${data.error || 'Error desconocido'}`);
       }
     } catch (error) {
       console.error('Error submitting comment:', error);
