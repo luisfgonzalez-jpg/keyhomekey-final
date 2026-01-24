@@ -72,4 +72,4 @@ export const createClient = createBrowserSupabaseClient;
 
 // Force build cache invalidation - PR #30
 // Module restructured with new exports to force Next.js complete rebuild
-// Version: ${SUPABASE_CONFIG_VERSION}
+// Version: 2.0.0-cookies
