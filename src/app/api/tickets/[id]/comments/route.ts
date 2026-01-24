@@ -10,7 +10,7 @@ export async function GET(
 
     // Read token from Authorization header
     const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = authHeader?.replace(/^Bearer\s+/i, '');
 
     if (!token) {
       return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
@@ -57,7 +57,7 @@ export async function POST(
 
     // Read token from Authorization header
     const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = authHeader?.replace(/^Bearer\s+/i, '');
 
     if (!token) {
       return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });

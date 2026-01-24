@@ -22,6 +22,9 @@ interface TicketTimelineProps {
   ticketId: string;
 }
 
+// Supabase auth token key in localStorage
+const SUPABASE_AUTH_TOKEN_KEY = 'sb-todzeqtqulonaaaqcdtp-auth-token';
+
 export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
   // Initialize Supabase client with user session (memoized to avoid recreating on every render)
   const supabase = useMemo(() => createClient(), []);
@@ -37,7 +40,7 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
   // Helper function to get auth token from localStorage
   const getAuthToken = (): string | null => {
     try {
-      const authData = localStorage.getItem('sb-todzeqtqulonaaaqcdtp-auth-token');
+      const authData = localStorage.getItem(SUPABASE_AUTH_TOKEN_KEY);
       if (!authData) return null;
       
       const parsed = JSON.parse(authData);
