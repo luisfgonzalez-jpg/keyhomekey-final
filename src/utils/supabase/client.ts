@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import type { CookieOptions } from '@supabase/ssr'
 
 export function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -8,5 +9,44 @@ export function createClient() {
     throw new Error('Missing Supabase environment variables (URL or Anon Key)');
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get(name: string) {
+        const cookie = document.cookie
+          .split('; ')
+          .find(row => row.startsWith(`${name}=`));
+        if (!cookie) return null;
+        const value = cookie.substring(name.length + 1);
+        return decodeURIComponent(value);
+      },
+      set(name: string, value: string, options: CookieOptions) {
+        const encodedValue = encodeURIComponent(value);
+        let cookieString = `${name}=${encodedValue}; path=/; SameSite=Lax`;
+        
+        if (options.maxAge) {
+          cookieString += `; max-age=${options.maxAge}`;
+        }
+        
+        if (options.domain) {
+          cookieString += `; domain=${options.domain}`;
+        }
+        
+        if (options.secure) {
+          cookieString += '; Secure';
+        }
+        
+        document.cookie = cookieString;
+      },
+      remove(name: string, options: CookieOptions) {
+        const path = options.path || '/';
+        let cookieString = `${name}=; path=${path}; max-age=0`;
+        
+        if (options.domain) {
+          cookieString += `; domain=${options.domain}`;
+        }
+        
+        document.cookie = cookieString;
+      }
+    }
+  });
 }
