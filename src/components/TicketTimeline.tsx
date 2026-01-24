@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { MessageCircle, Upload, Send, Image as ImageIcon, X, Clock } from 'lucide-react';
 import Image from 'next/image';
@@ -23,8 +23,8 @@ interface TicketTimelineProps {
 }
 
 export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
-  // Initialize Supabase client with user session
-  const supabase = createClient();
+  // Initialize Supabase client with user session (memoized to avoid recreating on every render)
+  const supabase = useMemo(() => createClient(), []);
   
   const [comments, setComments] = useState<Comment[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
