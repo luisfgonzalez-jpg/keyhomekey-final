@@ -100,8 +100,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
     }
 
+    // Verify that we have property data (required for ownership check)
+    if (!existingTicket.properties) {
+      console.error('Property data not found for ticket');
+      return NextResponse.json({ error: 'Ticket property data not found' }, { status: 500 });
+    }
+
     // Check if user is owner or admin
-    const isOwner = existingTicket.properties?.owner_id === user.id;
+    const isOwner = existingTicket.properties.owner_id === user.id;
     const userMeta = user.user_metadata || {};
     const appMeta = user.app_metadata || {};
     const userRole = ((userMeta.role as string) || (appMeta.role as string) || '').toUpperCase();

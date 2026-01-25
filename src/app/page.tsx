@@ -1228,7 +1228,7 @@ export default function HomePage() {
 
       for (const file of editTicketFiles) {
         const fileExtension = file.name.split('.').pop() || 'file';
-        const uniqueName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExtension}`;
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}.${fileExtension}`;
         const path = `tickets/${selectedTicket.property_id}/${uniqueName}`;
 
         const { error: uploadError } = await supabase.storage
