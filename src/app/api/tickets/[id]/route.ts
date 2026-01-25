@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 
 // Environment variables
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -141,7 +142,14 @@ export async function PATCH(
     }
 
     // Build update object with only provided fields
-    const updates: Record<string, any> = {};
+    const updates: {
+      title?: string;
+      description?: string;
+      priority?: string;
+      category?: string;
+      status?: string;
+      media_urls?: string[];
+    } = {};
     if (title !== undefined) updates.title = title;
     if (description !== undefined) updates.description = description;
     if (priority !== undefined) updates.priority = priority;
@@ -159,18 +167,27 @@ export async function PATCH(
 
       const currentMediaUrls = currentTicket?.media_urls || [];
       const newMediaUrls: string[] = [];
+      const uploadErrors: string[] = [];
 
       // Upload new images to ticket-images bucket
-      for (const image of images) {
+      for (let i = 0; i < images.length; i++) {
+        const image = images[i];
         try {
+          // Validate image data exists
+          if (!image) {
+            uploadErrors.push(`Image ${i + 1}: No data provided`);
+            continue;
+          }
+
           // Assuming images come as base64 or file data
-          const fileName = `${ticketId}/${Date.now()}-${Math.random().toString(36).substring(7)}`;
+          const fileName = `${ticketId}/${Date.now()}-${randomUUID()}`;
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('ticket-images')
             .upload(fileName, image);
 
           if (uploadError) {
             console.error('Error uploading image:', uploadError);
+            uploadErrors.push(`Image ${i + 1}: ${uploadError.message}`);
             continue;
           }
 
@@ -178,12 +195,25 @@ export async function PATCH(
             newMediaUrls.push(uploadData.path);
           }
         } catch (uploadErr) {
+          const errorMsg = uploadErr instanceof Error ? uploadErr.message : 'Unknown error';
           console.error('Error processing image upload:', uploadErr);
+          uploadErrors.push(`Image ${i + 1}: ${errorMsg}`);
         }
       }
 
       // Append new URLs to existing ones
       updates.media_urls = [...currentMediaUrls, ...newMediaUrls];
+
+      // If all images failed to upload, return an error
+      if (images.length > 0 && newMediaUrls.length === 0) {
+        return NextResponse.json(
+          { 
+            error: 'Failed to upload images', 
+            details: uploadErrors 
+          }, 
+          { status: 500 }
+        );
+      }
     }
 
     // Update ticket with new values
