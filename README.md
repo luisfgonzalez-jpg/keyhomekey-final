@@ -206,6 +206,12 @@ The application provides two WhatsApp-related endpoints:
 
 ### Troubleshooting
 
+**"Permission denied for table users" errors:**
+- This is fixed by applying the migration `20260124000000_fix_comments_rls_policies.sql`
+- If you see this error, ensure both migrations are applied in order
+- The fix uses JWT token data instead of querying the `auth.users` table
+- Verify by running: `supabase db push` or applying the migration manually
+
 **Webhook verification fails:**
 - Ensure `WHATSAPP_WEBHOOK_VERIFY_TOKEN` matches the token in Meta console
 - Check that your webhook URL is publicly accessible (not localhost)
@@ -244,15 +250,18 @@ This application includes a complete ticket comment system with real-time update
 
 ### Database Setup
 
-1. Apply the database migration to create the `ticket_comments` table:
+1. Apply the database migrations to create the `ticket_comments` table and fix RLS policies:
 
 ```bash
 # If using Supabase CLI
 supabase db push
 
 # Or apply manually in Supabase SQL Editor
-# Run the SQL in: supabase/migrations/20260123000000_add_ticket_comments.sql
+# First, run: supabase/migrations/20260123000000_add_ticket_comments.sql
+# Then, run: supabase/migrations/20260124000000_fix_comments_rls_policies.sql
 ```
+
+**Important:** The second migration (20260124000000) is required to fix "permission denied for table users" errors. It updates RLS policies to use JWT token data instead of querying the `auth.users` table.
 
 2. Ensure you have a storage bucket named `tickets-media` in Supabase for file uploads
 
