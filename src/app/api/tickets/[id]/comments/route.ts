@@ -192,7 +192,17 @@ export async function POST(
       Promise.all(notifications).catch(err => console.error('Error sending notifications:', err));
     }
 
-    return NextResponse.json({ success: true, comment: newComment });
+    // Attach user info from JWT token (not from database) to avoid permission errors
+    const commentWithUser = {
+      ...newComment,
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.user_metadata?.full_name || user.email
+      }
+    };
+
+    return NextResponse.json({ success: true, comment: commentWithUser });
   } catch (error: unknown) {
     console.error('Error in POST /api/tickets/[id]/comments:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
