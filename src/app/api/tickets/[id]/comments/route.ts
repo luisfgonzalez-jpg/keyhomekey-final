@@ -1,6 +1,34 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
+// Constants for user defaults
+const DEFAULT_USER_NAME = 'Usuario';
+const DEFAULT_USER_ROLE = 'TENANT' as const;
+
+/**
+ * Extracts user display name from JWT user object
+ * Falls back to email username if metadata not available
+ */
+function getUserDisplayName(user: { user_metadata?: Record<string, unknown>; email?: string }): string {
+  const metadata = user.user_metadata || {};
+  return (metadata.full_name as string) || 
+         (metadata.name as string) || 
+         user.email?.split('@')[0] || 
+         DEFAULT_USER_NAME;
+}
+
+/**
+ * Extracts user role from JWT user object
+ * Falls back to TENANT if metadata not available
+ */
+function getUserRole(user: { user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }): string {
+  const userMeta = user.user_metadata || {};
+  const appMeta = user.app_metadata || {};
+  return (userMeta.role as string) || 
+         (appMeta.role as string) || 
+         DEFAULT_USER_ROLE;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -74,10 +102,8 @@ export async function POST(
     }
 
     // Get user info from JWT/session (no database query to avoid permission errors)
-    // Use email-based fallbacks since JWT doesn't include custom profile data by default
-    const userName = user.user_metadata?.full_name || user.user_metadata?.name || 
-                     user.email?.split('@')[0] || 'Usuario';
-    const userRole = user.user_metadata?.role || user.app_metadata?.role || 'TENANT';
+    const userName = getUserDisplayName(user);
+    const userRole = getUserRole(user);
 
     // Crear comentario
     const { data: newComment, error: insertError } = await supabase
