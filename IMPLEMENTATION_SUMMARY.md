@@ -3,12 +3,18 @@
 ## Overview
 Successfully implemented a complete ticket comment system and activity timeline for the KeyHomeKey application, fulfilling all requirements from the problem statement.
 
+## 🔧 Critical Fix Applied (Jan 24, 2026)
+**Fixed "permission denied for table users" errors** by updating RLS policies to use JWT token data instead of querying `auth.users` table.
+- Migration: `supabase/migrations/20260124000000_fix_comments_rls_policies.sql`
+- Changed: `SELECT email FROM auth.users` → `auth.jwt() ->> 'email'`
+- Impact: Comments API now works without RLS permission errors
+
 ## What Was Built
 
-### 1. Database Layer (`supabase/migrations/20260123000000_add_ticket_comments.sql`)
-- **ticket_comments table**: Stores all ticket comments with metadata
+### 1. Database Layer
+- **ticket_comments table**: Stores all ticket comments with metadata (`20260123000000_add_ticket_comments.sql`)
+- **RLS Policies Fix**: Updated to use JWT tokens instead of querying auth.users (`20260124000000_fix_comments_rls_policies.sql`)
 - **Indexes**: Optimized queries on ticket_id, created_at, and user_id
-- **Row Level Security**: Ensures users only see comments for tickets they have access to
 - **Triggers**: Auto-updates timestamps
 - **Realtime**: Configured for live updates
 
@@ -77,7 +83,8 @@ Successfully implemented a complete ticket comment system and activity timeline 
 keyhomekey-final/
 ├── supabase/
 │   └── migrations/
-│       └── 20260123000000_add_ticket_comments.sql
+│       ├── 20260123000000_add_ticket_comments.sql
+│       └── 20260124000000_fix_comments_rls_policies.sql
 ├── src/
 │   ├── app/
 │   │   └── api/
@@ -103,13 +110,14 @@ keyhomekey-final/
 
 ## How to Use
 
-### 1. Apply Database Migration
+### 1. Apply Database Migrations
 ```bash
 # Using Supabase CLI
 supabase db push
 
 # Or manually in Supabase SQL Editor
-# Copy and run the SQL from supabase/migrations/20260123000000_add_ticket_comments.sql
+# First apply: supabase/migrations/20260123000000_add_ticket_comments.sql
+# Then apply: supabase/migrations/20260124000000_fix_comments_rls_policies.sql
 ```
 
 ### 2. Create Storage Bucket
