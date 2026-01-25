@@ -1,15 +1,39 @@
-import { createClient } from '@/utils/supabase/server';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+
+// Environment variables
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // Constants for user defaults
 const DEFAULT_USER_NAME = 'Usuario';
 const DEFAULT_USER_ROLE = 'TENANT' as const;
 
+// Type definitions
+interface AuthenticatedUser {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+  app_metadata?: Record<string, unknown>;
+}
+
+interface AuthSuccess {
+  supabase: SupabaseClient;
+  user: AuthenticatedUser;
+  error?: undefined;
+}
+
+interface AuthError {
+  error: NextResponse;
+  supabase?: undefined;
+  user?: undefined;
+}
+
 /**
  * Extracts user display name from JWT user object
  * Falls back to email username if metadata not available
  */
-function getUserDisplayName(user: { user_metadata?: Record<string, unknown>; email?: string }): string {
+function getUserDisplayName(user: AuthenticatedUser): string {
   const metadata = user.user_metadata || {};
   return (metadata.full_name as string) || 
          (metadata.name as string) || 
@@ -21,12 +45,41 @@ function getUserDisplayName(user: { user_metadata?: Record<string, unknown>; ema
  * Extracts user role from JWT user object
  * Falls back to TENANT if metadata not available
  */
-function getUserRole(user: { user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }): string {
+function getUserRole(user: AuthenticatedUser): string {
   const userMeta = user.user_metadata || {};
   const appMeta = user.app_metadata || {};
   return (userMeta.role as string) || 
          (appMeta.role as string) || 
          DEFAULT_USER_ROLE;
+}
+
+/**
+ * Creates an authenticated Supabase client using the Bearer token from request headers
+ * Returns the client and authenticated user, or an error response if authentication fails
+ */
+async function createAuthenticatedClient(request: NextRequest): Promise<AuthSuccess | AuthError> {
+  // Read token from Authorization header
+  const authHeader = request.headers.get('authorization');
+  const token = authHeader?.replace(/^Bearer\s+/i, '');
+
+  if (!token) {
+    return { error: NextResponse.json({ error: 'No authorization token provided' }, { status: 401 }) };
+  }
+
+  // Create Supabase client with the user's JWT token for RLS enforcement
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } }
+  });
+  
+  // Validate token with Supabase
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  
+  if (authError || !user) {
+    console.error('Auth error:', authError);
+    return { error: NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 }) };
+  }
+
+  return { supabase, user };
 }
 
 export async function GET(
@@ -36,23 +89,12 @@ export async function GET(
   try {
     const { id: ticketId } = await params;
 
-    // Read token from Authorization header
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace(/^Bearer\s+/i, '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
+    // Create authenticated Supabase client
+    const authResult = await createAuthenticatedClient(request);
+    if (authResult.error) {
+      return authResult.error;
     }
-
-    const supabase = await createClient();
-    
-    // Validate token with Supabase
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
-    }
+    const { supabase } = authResult;
 
     // Obtener comentarios con verificación de acceso (RLS se encarga)
     const { data: comments, error } = await supabase
@@ -83,23 +125,12 @@ export async function POST(
     const body = await request.json();
     const { comment_text, media_urls = [], comment_type = 'comment' } = body;
 
-    // Read token from Authorization header
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace(/^Bearer\s+/i, '');
-
-    if (!token) {
-      return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
+    // Create authenticated Supabase client
+    const authResult = await createAuthenticatedClient(request);
+    if (authResult.error) {
+      return authResult.error;
     }
-
-    const supabase = await createClient();
-    
-    // Validate token with Supabase
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
-    }
+    const { supabase, user } = authResult;
 
     // Get user info from JWT/session (no database query to avoid permission errors)
     const userName = getUserDisplayName(user);
