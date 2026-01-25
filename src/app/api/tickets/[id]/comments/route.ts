@@ -1,18 +1,57 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
+// Constants for user defaults
+const DEFAULT_USER_NAME = 'Usuario';
+const DEFAULT_USER_ROLE = 'TENANT' as const;
+
+/**
+ * Extracts user display name from JWT user object
+ * Falls back to email username if metadata not available
+ */
+function getUserDisplayName(user: { user_metadata?: Record<string, unknown>; email?: string }): string {
+  const metadata = user.user_metadata || {};
+  return (metadata.full_name as string) || 
+         (metadata.name as string) || 
+         user.email?.split('@')[0] || 
+         DEFAULT_USER_NAME;
+}
+
+/**
+ * Extracts user role from JWT user object
+ * Falls back to TENANT if metadata not available
+ */
+function getUserRole(user: { user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }): string {
+  const userMeta = user.user_metadata || {};
+  const appMeta = user.app_metadata || {};
+  return (userMeta.role as string) || 
+         (appMeta.role as string) || 
+         DEFAULT_USER_ROLE;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const { id: ticketId } = await params;
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Read token from Authorization header
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace(/^Bearer\s+/i, '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
+    }
+
+    const supabase = await createClient();
+    
+    // Validate token with Supabase
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.error('Auth error:', authError);
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
     }
 
     // Obtener comentarios con verificación de acceso (RLS se encarga)
@@ -40,27 +79,31 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const { id: ticketId } = await params;
     const body = await request.json();
     const { comment_text, media_urls = [], comment_type = 'comment' } = body;
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Read token from Authorization header
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace(/^Bearer\s+/i, '');
+
+    if (!token) {
+      return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
+    }
+
+    const supabase = await createClient();
+    
+    // Validate token with Supabase
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.error('Auth error:', authError);
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
     }
 
-    // Obtener info del usuario
-    const { data: profile } = await supabase
-      .from('users_profiles')
-      .select('name, role')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
-    }
+    // Get user info from JWT/session (no database query to avoid permission errors)
+    const userName = getUserDisplayName(user);
+    const userRole = getUserRole(user);
 
     // Crear comentario
     const { data: newComment, error: insertError } = await supabase
@@ -68,8 +111,8 @@ export async function POST(
       .insert([{
         ticket_id: ticketId,
         user_id: user.id,
-        user_name: profile.name,
-        user_role: profile.role,
+        user_name: userName,
+        user_role: userRole,
         comment_text,
         comment_type,
         media_urls,
@@ -104,7 +147,7 @@ export async function POST(
     if (ticket) {
       // Función para crear el mensaje de notificación
       const createNotificationMessage = (role: string) => {
-        return `💬 Nuevo comentario en ticket #${ticketId.substring(0, 8)}\nDe: ${profile.name} (${role})\n"${comment_text}"\n\nVer ticket: ${process.env.NEXT_PUBLIC_SITE_URL || ''}/tickets/${ticketId}`;
+        return `💬 Nuevo comentario en ticket #${ticketId.substring(0, 8)}\nDe: ${userName} (${role})\n"${comment_text}"\n\nVer ticket: ${process.env.NEXT_PUBLIC_SITE_URL || ''}/tickets/${ticketId}`;
       };
 
       // Base URL para las notificaciones
@@ -118,28 +161,28 @@ export async function POST(
       const notifications = [];
       
       // Notificar al proveedor si existe y no es quien comentó
-      if (ticket.assigned_provider_id && profile.role !== 'PROVIDER' && ticket.providers?.phone) {
+      if (ticket.assigned_provider_id && userRole !== 'PROVIDER' && ticket.providers?.phone) {
         notifications.push(
           fetch(notifyApiUrl, {
             method: 'POST',
             headers: apiHeaders,
             body: JSON.stringify({
               to: ticket.providers.phone,
-              message: createNotificationMessage(profile.role)
+              message: createNotificationMessage(userRole)
             })
           })
         );
       }
 
       // Notificar al inquilino si no es quien comentó
-      if (profile.role !== 'TENANT' && ticket.properties?.tenant_phone) {
+      if (userRole !== 'TENANT' && ticket.properties?.tenant_phone) {
         notifications.push(
           fetch(notifyApiUrl, {
             method: 'POST',
             headers: apiHeaders,
             body: JSON.stringify({
               to: ticket.properties.tenant_phone,
-              message: createNotificationMessage(profile.role)
+              message: createNotificationMessage(userRole)
             })
           })
         );
@@ -149,7 +192,17 @@ export async function POST(
       Promise.all(notifications).catch(err => console.error('Error sending notifications:', err));
     }
 
-    return NextResponse.json({ success: true, comment: newComment });
+    // Attach user info from JWT token (not from database) to avoid permission errors
+    const commentWithUser = {
+      ...newComment,
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: getUserDisplayName(user)
+      }
+    };
+
+    return NextResponse.json({ success: true, comment: commentWithUser });
   } catch (error: unknown) {
     console.error('Error in POST /api/tickets/[id]/comments:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';

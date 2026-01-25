@@ -22,6 +22,9 @@ interface TicketTimelineProps {
   ticketId: string;
 }
 
+// Supabase auth token key in localStorage
+const SUPABASE_AUTH_TOKEN_KEY = 'sb-todzeqtqulonaaaqcdtp-auth-token';
+
 export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
   // Initialize Supabase client with user session (memoized to avoid recreating on every render)
   const supabase = useMemo(() => createClient(), []);
@@ -34,17 +37,48 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Helper function to get auth token from localStorage
+  const getAuthToken = (): string | null => {
+    try {
+      const authData = localStorage.getItem(SUPABASE_AUTH_TOKEN_KEY);
+      if (!authData) return null;
+      
+      const parsed = JSON.parse(authData);
+      return parsed.access_token || null;
+    } catch (error) {
+      console.error('Error reading auth token:', error);
+      return null;
+    }
+  };
+
   // Cargar comentarios iniciales
   useEffect(() => {
     const fetchComments = async () => {
       try {
+        const token = getAuthToken();
+        if (!token) {
+          console.error('No auth token found');
+          return;
+        }
+
         const response = await fetch(`/api/tickets/${ticketId}/comments`, {
-          credentials: 'same-origin'
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch comments');
+        }
+
         const data = await response.json();
         
         if (data.success) {
           setComments(data.comments);
+        } else if (Array.isArray(data)) {
+          // Handle case where API returns array directly
+          setComments(data);
         }
       } catch (error) {
         console.error('Error fetching comments:', error);
@@ -140,6 +174,14 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
     setError(null);
 
     try {
+      const token = getAuthToken();
+      if (!token) {
+        setError('Sesión expirada. Por favor inicia sesión nuevamente.');
+        setLoading(false);
+        setUploading(false);
+        return;
+      }
+
       let media_urls: string[] = [];
 
       // Upload files first
@@ -150,8 +192,8 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
       // Create comment
       const response = await fetch(`/api/tickets/${ticketId}/comments`, {
         method: 'POST',
-        credentials: 'same-origin',
         headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -160,6 +202,11 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
           comment_type: selectedFiles.length > 0 ? 'media_added' : 'comment',
         }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create comment');
+      }
 
       const data = await response.json();
 
@@ -174,7 +221,8 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
       }
     } catch (error) {
       console.error('Error submitting comment:', error);
-      setError('Error al agregar comentario. Por favor, intenta de nuevo.');
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      setError(`Error al agregar comentario: ${errorMessage}`);
     } finally {
       setLoading(false);
       setUploading(false);
