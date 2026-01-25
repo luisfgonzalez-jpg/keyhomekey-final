@@ -16,6 +16,23 @@ interface AuthenticatedUser {
   app_metadata?: Record<string, unknown>;
 }
 
+interface MediaInfo {
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}
+
+interface TicketUpdate {
+  updated_at: string;
+  description?: string;
+  priority?: string;
+  category?: string;
+  title?: string;
+  media_urls?: string[];
+  media_info?: MediaInfo[];
+}
+
 interface AuthSuccess {
   supabase: SupabaseClient;
   user: AuthenticatedUser;
@@ -145,7 +162,7 @@ export async function PATCH(
     }
 
     // Build update object with only provided fields
-    const updates: Record<string, string | string[] | Record<string, unknown>[]> = {
+    const updates: TicketUpdate = {
       updated_at: new Date().toISOString()
     };
 
