@@ -79,7 +79,7 @@ interface Ticket {
   created_at?: string;
 }
 
-type Role = 'OWNER' | 'TENANT' | 'PROVIDER' | null;
+type Role = 'OWNER' | 'TENANT' | 'PROVIDER' | 'ADMIN' | null;
 
 interface UserProfile {
   id?: string;
@@ -2634,7 +2634,15 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {!isEditMode && ticketProperty?.owner_id === session?.user?.id && (
+                {!isEditMode && (() => {
+                  // Check if user can edit: owner, tenant, or admin
+                  const isOwner = ticketProperty?.owner_id === session?.user?.id;
+                  const isTenant = ticketProperty?.tenant_email === session?.user?.email;
+                  const isAdmin = userRole === 'ADMIN' || 
+                    (session?.user as any)?.user_metadata?.role?.toUpperCase() === 'ADMIN' ||
+                    (session?.user as any)?.app_metadata?.role?.toUpperCase() === 'ADMIN';
+                  return isOwner || isTenant || isAdmin;
+                })() && (
                   <button 
                     onClick={handleEditTicket}
                     className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
