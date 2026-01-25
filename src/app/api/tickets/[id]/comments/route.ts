@@ -73,9 +73,10 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
     }
 
-    // Get user info from JWT/session (no database query needed)
-    // Use email as name fallback if name not in metadata
-    const userName = user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario';
+    // Get user info from JWT/session (no database query to avoid permission errors)
+    // Use email-based fallbacks since JWT doesn't include custom profile data by default
+    const userName = user.user_metadata?.full_name || user.user_metadata?.name || 
+                     user.email?.split('@')[0] || 'Usuario';
     const userRole = user.user_metadata?.role || user.app_metadata?.role || 'TENANT';
 
     // Crear comentario
