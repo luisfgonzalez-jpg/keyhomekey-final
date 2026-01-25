@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 // Environment variables
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Type definitions
 interface AuthenticatedUser {
@@ -24,13 +23,6 @@ interface AuthError {
   error: NextResponse;
   supabase?: undefined;
   user?: undefined;
-}
-
-interface MediaInfo {
-  url: string;
-  name: string;
-  type: string;
-  size: number;
 }
 
 /**
@@ -110,7 +102,9 @@ export async function PATCH(
 
     // Check if user is owner or admin
     const isOwner = existingTicket.properties?.owner_id === user.id;
-    const userRole = (user.user_metadata?.role || user.app_metadata?.role || '').toUpperCase();
+    const userMeta = user.user_metadata || {};
+    const appMeta = user.app_metadata || {};
+    const userRole = ((userMeta.role as string) || (appMeta.role as string) || '').toUpperCase();
     const isAdmin = userRole === 'ADMIN';
 
     if (!isOwner && !isAdmin) {
