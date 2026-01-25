@@ -34,6 +34,8 @@ import {
   Star,
   TrendingUp,
   TrendingDown,
+  Edit,
+  Save,
 } from 'lucide-react';
 
 import {
@@ -835,6 +837,13 @@ export default function HomePage() {
   // Ticket detail modal states
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [showTicketDetailModal, setShowTicketDetailModal] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editTicketForm, setEditTicketForm] = useState({
+    description: '',
+    priority: '',
+    category: '',
+  });
+  const [editTicketFiles, setEditTicketFiles] = useState<File[]>([]);
 
   // Estados para modales
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -1188,7 +1197,110 @@ export default function HomePage() {
   const handleCloseTicketModal = useCallback(() => {
     setShowTicketDetailModal(false);
     setSelectedTicket(null);
+    setIsEditMode(false);
+    setEditTicketFiles([]);
   }, []);
+
+  const handleEditTicket = useCallback(() => {
+    if (!selectedTicket) return;
+    setEditTicketForm({
+      description: selectedTicket.description,
+      priority: selectedTicket.priority,
+      category: selectedTicket.category,
+    });
+    setIsEditMode(true);
+  }, [selectedTicket]);
+
+  const handleCancelEdit = useCallback(() => {
+    setIsEditMode(false);
+    setEditTicketFiles([]);
+  }, []);
+
+  const handleSaveTicket = useCallback(async () => {
+    if (!selectedTicket || !session?.user) return;
+
+    try {
+      setLoading(true);
+
+      // Upload any new files
+      const newMediaPaths: string[] = [];
+      const newMediaInfo: MediaInfo[] = [];
+
+      for (const file of editTicketFiles) {
+        const fileExtension = file.name.split('.').pop() || 'file';
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}.${fileExtension}`;
+        const path = `tickets/${selectedTicket.property_id}/${uniqueName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('tickets-media')
+          .upload(path, file, { cacheControl: '3600', upsert: false });
+
+        if (uploadError) {
+          console.error('Error uploading file:', uploadError);
+          continue;
+        }
+
+        newMediaPaths.push(path);
+        newMediaInfo.push({ 
+          url: path, 
+          name: file.name, 
+          type: file.type, 
+          size: file.size 
+        });
+      }
+
+      // Get auth token
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const token = currentSession?.access_token;
+
+      if (!token) {
+        alert('No se pudo obtener el token de autenticación');
+        return;
+      }
+
+      // Call PATCH endpoint
+      const payload: Record<string, any> = {
+        description: editTicketForm.description,
+        priority: editTicketForm.priority,
+        category: editTicketForm.category,
+      };
+
+      if (newMediaPaths.length > 0) {
+        payload.newMediaPaths = newMediaPaths;
+        payload.newMediaInfo = newMediaInfo;
+      }
+
+      const response = await fetch(`/api/tickets/${selectedTicket.id}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        alert(`Error actualizando ticket: ${result.error || 'Error desconocido'}`);
+        return;
+      }
+
+      // Update local state
+      setTickets((prev) =>
+        prev.map((t) => (t.id === selectedTicket.id ? result.ticket : t))
+      );
+      setSelectedTicket(result.ticket);
+      setIsEditMode(false);
+      setEditTicketFiles([]);
+      alert('✅ Ticket actualizado correctamente');
+    } catch (err: any) {
+      console.error('Error saving ticket:', err);
+      alert(`Error: ${err.message || 'No se pudo actualizar el ticket'}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedTicket, session, editTicketForm, editTicketFiles, supabase]);
 
   // Keyboard accessibility for ticket modal
   useEffect(() => {
@@ -2514,77 +2626,177 @@ export default function HomePage() {
                 </h2>
                 <div className="flex items-center gap-3 mt-2">
                   <StatusBadge status={selectedTicket.status} />
-                  <span className="text-sm text-[#64748B]">
-                    {selectedTicket.category} · {selectedTicket.priority}
-                  </span>
+                  {!isEditMode && (
+                    <span className="text-sm text-[#64748B]">
+                      {selectedTicket.category} · {selectedTicket.priority}
+                    </span>
+                  )}
                 </div>
               </div>
-              <button 
-                onClick={handleCloseTicketModal}
-                className="text-[#64748B] hover:text-[#1E293B] transition-colors"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            {/* Description */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-[#64748B] mb-2">Descripción</h3>
-              <p className="text-sm text-[#1E293B] whitespace-pre-wrap">{selectedTicket.description}</p>
-            </div>
-
-            {/* Property Info */}
-            {ticketProperty && (
-              <div className="mb-6 p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-                <h3 className="text-sm font-semibold text-[#64748B] mb-2">Propiedad</h3>
-                <p className="text-sm font-semibold text-[#1E293B] flex items-center gap-2">
-                  <MapPin size={16} />
-                  {ticketProperty.address}
-                </p>
-                <p className="text-xs text-[#64748B] mt-1">
-                  {ticketProperty.municipality}, {ticketProperty.department} · {ticketProperty.type}
-                </p>
+              <div className="flex items-center gap-2">
+                {!isEditMode && ticketProperty?.owner_id === session?.user?.id && (
+                  <button 
+                    onClick={handleEditTicket}
+                    className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    <Edit size={16} />
+                    Editar
+                  </button>
+                )}
+                <button 
+                  onClick={handleCloseTicketModal}
+                  className="text-[#64748B] hover:text-[#1E293B] transition-colors"
+                >
+                  <X size={24} />
+                </button>
               </div>
+            </div>
+
+            {isEditMode ? (
+              /* Edit Mode Form */
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[#64748B] mb-2">Categoría</label>
+                  <select
+                    value={editTicketForm.category}
+                    onChange={(e) => setEditTicketForm(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400"
+                  >
+                    <option>Plomería</option>
+                    <option>Eléctrico</option>
+                    <option>Electrodomésticos</option>
+                    <option>Cerrajería</option>
+                    <option>Otros</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#64748B] mb-2">Prioridad</label>
+                  <select
+                    value={editTicketForm.priority}
+                    onChange={(e) => setEditTicketForm(prev => ({ ...prev, priority: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400"
+                  >
+                    <option>Alta</option>
+                    <option>Media</option>
+                    <option>Baja</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#64748B] mb-2">Descripción</label>
+                  <textarea
+                    value={editTicketForm.description}
+                    onChange={(e) => setEditTicketForm(prev => ({ ...prev, description: e.target.value }))}
+                    rows={6}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400 resize-none"
+                    placeholder="Describe la falla o situación"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#64748B] mb-2">Agregar nuevas imágenes</label>
+                  <FileUploader files={editTicketFiles} setFiles={setEditTicketFiles} />
+                </div>
+
+                {/* Existing Media */}
+                {selectedTicket.media_urls && selectedTicket.media_urls.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-[#64748B] mb-3">Imágenes actuales</h3>
+                    <MediaViewer 
+                      mediaUrls={selectedTicket.media_urls} 
+                      mediaInfo={selectedTicket.media_info} 
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4 border-t border-[#E2E8F0]">
+                  <button
+                    onClick={handleCancelEdit}
+                    disabled={loading}
+                    className="flex-1 px-4 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSaveTicket}
+                    disabled={loading}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                  >
+                    {loading ? (
+                      'Guardando...'
+                    ) : (
+                      <>
+                        <Save size={16} />
+                        Guardar cambios
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* View Mode */
+              <>
+                {/* Description */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-[#64748B] mb-2">Descripción</h3>
+                  <p className="text-sm text-[#1E293B] whitespace-pre-wrap">{selectedTicket.description}</p>
+                </div>
+
+                {/* Property Info */}
+                {ticketProperty && (
+                  <div className="mb-6 p-4 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                    <h3 className="text-sm font-semibold text-[#64748B] mb-2">Propiedad</h3>
+                    <p className="text-sm font-semibold text-[#1E293B] flex items-center gap-2">
+                      <MapPin size={16} />
+                      {ticketProperty.address}
+                    </p>
+                    <p className="text-xs text-[#64748B] mt-1">
+                      {ticketProperty.municipality}, {ticketProperty.department} · {ticketProperty.type}
+                    </p>
+                  </div>
+                )}
+
+                {/* Existing Media */}
+                {selectedTicket.media_urls && selectedTicket.media_urls.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-[#64748B] mb-3">Archivos del Reporte Inicial</h3>
+                    <MediaViewer 
+                      mediaUrls={selectedTicket.media_urls} 
+                      mediaInfo={selectedTicket.media_info} 
+                    />
+                  </div>
+                )}
+
+                {/* Ticket Info Grid */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="p-3 bg-[#F8FAFC] rounded-xl">
+                    <p className="text-xs text-[#64748B] mb-1">Reportado por</p>
+                    <p className="text-sm font-semibold text-[#1E293B]">{selectedTicket.reporter}</p>
+                    <p className="text-xs text-[#64748B]">{selectedTicket.reported_by_email}</p>
+                  </div>
+                  <div className="p-3 bg-[#F8FAFC] rounded-xl">
+                    <p className="text-xs text-[#64748B] mb-1">Fecha de creación</p>
+                    <p className="text-sm font-semibold text-[#1E293B]">
+                      {selectedTicket.created_at 
+                        ? new Date(selectedTicket.created_at).toLocaleDateString('es-CO', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
+                        : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Timeline Section */}
+                <div className="border-t border-[#E2E8F0] pt-6">
+                  <TicketTimeline ticketId={selectedTicket.id} />
+                </div>
+              </>
             )}
-
-            {/* Existing Media */}
-            {selectedTicket.media_urls && selectedTicket.media_urls.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-[#64748B] mb-3">Archivos del Reporte Inicial</h3>
-                <MediaViewer 
-                  mediaUrls={selectedTicket.media_urls} 
-                  mediaInfo={selectedTicket.media_info} 
-                />
-              </div>
-            )}
-
-            {/* Ticket Info Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="p-3 bg-[#F8FAFC] rounded-xl">
-                <p className="text-xs text-[#64748B] mb-1">Reportado por</p>
-                <p className="text-sm font-semibold text-[#1E293B]">{selectedTicket.reporter}</p>
-                <p className="text-xs text-[#64748B]">{selectedTicket.reported_by_email}</p>
-              </div>
-              <div className="p-3 bg-[#F8FAFC] rounded-xl">
-                <p className="text-xs text-[#64748B] mb-1">Fecha de creación</p>
-                <p className="text-sm font-semibold text-[#1E293B]">
-                  {selectedTicket.created_at 
-                    ? new Date(selectedTicket.created_at).toLocaleDateString('es-CO', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    : 'N/A'}
-                </p>
-              </div>
-            </div>
-
-            {/* Timeline Section */}
-            <div className="border-t border-[#E2E8F0] pt-6">
-              <TicketTimeline ticketId={selectedTicket.id} />
-            </div>
           </div>
         </div>
       )}

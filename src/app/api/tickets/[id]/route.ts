@@ -70,17 +70,70 @@ async function createAuthenticatedClient(request: NextRequest): Promise<AuthSucc
   return { supabase, user };
 }
 
+/**
+ * PATCH /api/tickets/[id]
+ * Update ticket details - only owner or admin can edit
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: ticketId } = await params;
+    
+    // Create authenticated Supabase client
+    const authResult = await createAuthenticatedClient(request);
+    if (authResult.error) {
+      return authResult.error;
+    }
+    const { supabase, user } = authResult;
     // Extract ticket ID from params
     const { id: ticketId } = await params;
 
     // Parse request body
     const body = await request.json();
     const { 
+      description, 
+      priority, 
+      category,
+      title,
+      newMediaPaths,
+      newMediaInfo 
+    } = body;
+
+    // Get existing ticket to verify ownership
+    const { data: existingTicket, error: fetchError } = await supabase
+      .from('tickets')
+      .select(`
+        *,
+        properties!inner (
+          owner_id
+        )
+      `)
+      .eq('id', ticketId)
+      .single();
+
+    if (fetchError || !existingTicket) {
+      console.error('Error fetching ticket:', fetchError);
+      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
+    }
+
+    // Verify that we have property data (required for ownership check)
+    if (!existingTicket.properties) {
+      console.error('Property data not found for ticket');
+      return NextResponse.json({ error: 'Ticket property data not found' }, { status: 500 });
+    }
+
+    // Check if user is owner or admin
+    const isOwner = existingTicket.properties.owner_id === user.id;
+    const userMeta = user.user_metadata || {};
+    const appMeta = user.app_metadata || {};
+    const userRole = ((userMeta.role as string) || (appMeta.role as string) || '').toUpperCase();
+    const isAdmin = userRole === 'ADMIN';
+
+    if (!isOwner && !isAdmin) {
+      return NextResponse.json(
+        { error: 'No autorizado para editar este ticket' }, 
       title,
       description, 
       priority, 
@@ -142,6 +195,28 @@ export async function PATCH(
     }
 
     // Build update object with only provided fields
+    const updates: Record<string, any> = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (description !== undefined) updates.description = description;
+    if (priority !== undefined) updates.priority = priority;
+    if (category !== undefined) updates.category = category;
+    if (title !== undefined) updates.title = title;
+
+    // Handle new media uploads - append to existing media
+    if (newMediaPaths && Array.isArray(newMediaPaths) && newMediaPaths.length > 0) {
+      const existingMediaUrls = existingTicket.media_urls || [];
+      const existingMediaInfo = existingTicket.media_info || [];
+      
+      updates.media_urls = [...existingMediaUrls, ...newMediaPaths];
+      
+      if (newMediaInfo && Array.isArray(newMediaInfo)) {
+        updates.media_info = [...existingMediaInfo, ...newMediaInfo];
+      }
+    }
+
+    // Update ticket in database
     const updates: {
       title?: string;
       description?: string;
@@ -226,6 +301,10 @@ export async function PATCH(
 
     if (updateError) {
       console.error('Error updating ticket:', updateError);
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, ticket: updatedTicket });
       return NextResponse.json(
         { error: updateError.message }, 
         { status: 500 }
