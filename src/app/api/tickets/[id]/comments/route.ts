@@ -1,4 +1,5 @@
-import { createClient } from '@/utils/supabase/server';
+import { createClient as createServerClient } from '@/utils/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Constants for user defaults
@@ -44,7 +45,12 @@ export async function GET(
       return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    // Create Supabase client with the user's JWT token for RLS enforcement
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
     
     // Validate token with Supabase
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
@@ -91,7 +97,12 @@ export async function POST(
       return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    // Create Supabase client with the user's JWT token for RLS enforcement
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
     
     // Validate token with Supabase
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
