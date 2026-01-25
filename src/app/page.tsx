@@ -2634,7 +2634,11 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {!isEditMode && ticketProperty?.owner_id === session?.user?.id && (
+                {!isEditMode && (
+                  ticketProperty?.owner_id === session?.user?.id || 
+                  ticketProperty?.tenant_email === session?.user?.email ||
+                  userRole === 'ADMIN'
+                ) && (
                   <button 
                     onClick={handleEditTicket}
                     className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
