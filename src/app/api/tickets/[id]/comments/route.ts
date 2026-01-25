@@ -73,16 +73,10 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
     }
 
-    // Obtener info del usuario
-    const { data: profile } = await supabase
-      .from('users_profiles')
-      .select('name, role')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
-    }
+    // Get user info from JWT/session (no database query needed)
+    // Use email as name fallback if name not in metadata
+    const userName = user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario';
+    const userRole = user.user_metadata?.role || user.app_metadata?.role || 'TENANT';
 
     // Crear comentario
     const { data: newComment, error: insertError } = await supabase
@@ -90,8 +84,8 @@ export async function POST(
       .insert([{
         ticket_id: ticketId,
         user_id: user.id,
-        user_name: profile.name,
-        user_role: profile.role,
+        user_name: userName,
+        user_role: userRole,
         comment_text,
         comment_type,
         media_urls,
@@ -126,7 +120,7 @@ export async function POST(
     if (ticket) {
       // Función para crear el mensaje de notificación
       const createNotificationMessage = (role: string) => {
-        return `💬 Nuevo comentario en ticket #${ticketId.substring(0, 8)}\nDe: ${profile.name} (${role})\n"${comment_text}"\n\nVer ticket: ${process.env.NEXT_PUBLIC_SITE_URL || ''}/tickets/${ticketId}`;
+        return `💬 Nuevo comentario en ticket #${ticketId.substring(0, 8)}\nDe: ${userName} (${role})\n"${comment_text}"\n\nVer ticket: ${process.env.NEXT_PUBLIC_SITE_URL || ''}/tickets/${ticketId}`;
       };
 
       // Base URL para las notificaciones
@@ -140,28 +134,28 @@ export async function POST(
       const notifications = [];
       
       // Notificar al proveedor si existe y no es quien comentó
-      if (ticket.assigned_provider_id && profile.role !== 'PROVIDER' && ticket.providers?.phone) {
+      if (ticket.assigned_provider_id && userRole !== 'PROVIDER' && ticket.providers?.phone) {
         notifications.push(
           fetch(notifyApiUrl, {
             method: 'POST',
             headers: apiHeaders,
             body: JSON.stringify({
               to: ticket.providers.phone,
-              message: createNotificationMessage(profile.role)
+              message: createNotificationMessage(userRole)
             })
           })
         );
       }
 
       // Notificar al inquilino si no es quien comentó
-      if (profile.role !== 'TENANT' && ticket.properties?.tenant_phone) {
+      if (userRole !== 'TENANT' && ticket.properties?.tenant_phone) {
         notifications.push(
           fetch(notifyApiUrl, {
             method: 'POST',
             headers: apiHeaders,
             body: JSON.stringify({
               to: ticket.properties.tenant_phone,
-              message: createNotificationMessage(profile.role)
+              message: createNotificationMessage(userRole)
             })
           })
         );
