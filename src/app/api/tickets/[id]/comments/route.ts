@@ -1,15 +1,39 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+
+// Environment variables
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // Constants for user defaults
 const DEFAULT_USER_NAME = 'Usuario';
 const DEFAULT_USER_ROLE = 'TENANT' as const;
 
+// Type definitions
+interface AuthenticatedUser {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+  app_metadata?: Record<string, unknown>;
+}
+
+interface AuthSuccess {
+  supabase: SupabaseClient;
+  user: AuthenticatedUser;
+  error?: undefined;
+}
+
+interface AuthError {
+  error: NextResponse;
+  supabase?: undefined;
+  user?: undefined;
+}
+
 /**
  * Extracts user display name from JWT user object
  * Falls back to email username if metadata not available
  */
-function getUserDisplayName(user: { user_metadata?: Record<string, unknown>; email?: string }): string {
+function getUserDisplayName(user: AuthenticatedUser): string {
   const metadata = user.user_metadata || {};
   return (metadata.full_name as string) || 
          (metadata.name as string) || 
@@ -21,7 +45,7 @@ function getUserDisplayName(user: { user_metadata?: Record<string, unknown>; ema
  * Extracts user role from JWT user object
  * Falls back to TENANT if metadata not available
  */
-function getUserRole(user: { user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }): string {
+function getUserRole(user: AuthenticatedUser): string {
   const userMeta = user.user_metadata || {};
   const appMeta = user.app_metadata || {};
   return (userMeta.role as string) || 
@@ -33,10 +57,7 @@ function getUserRole(user: { user_metadata?: Record<string, unknown>; app_metada
  * Creates an authenticated Supabase client using the Bearer token from request headers
  * Returns the client and authenticated user, or an error response if authentication fails
  */
-async function createAuthenticatedClient(request: NextRequest): Promise<
-  { supabase: ReturnType<typeof createClient>; user: { id: string; email?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }; error?: undefined } | 
-  { error: NextResponse; supabase?: undefined; user?: undefined }
-> {
+async function createAuthenticatedClient(request: NextRequest): Promise<AuthSuccess | AuthError> {
   // Read token from Authorization header
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.replace(/^Bearer\s+/i, '');
@@ -46,9 +67,7 @@ async function createAuthenticatedClient(request: NextRequest): Promise<
   }
 
   // Create Supabase client with the user's JWT token for RLS enforcement
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: `Bearer ${token}` } }
   });
   
