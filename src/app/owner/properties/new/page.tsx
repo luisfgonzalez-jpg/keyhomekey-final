@@ -127,7 +127,26 @@ export default function NewPropertyPage() {
         return;
       }
 
-      // 2. Preparar payload de la propiedad
+      // 2. Look up tenant_id if manual mode with email provided
+      let tenantUserId = selectedTenantId;
+      
+      if (isRented && tenantEmail && !selectedTenantId) {
+        // Manual mode: try to find tenant by email in profiles
+        const { data: tenantProfile } = await supabase
+          .from('users_profiles')
+          .select('user_id')
+          .eq('email', tenantEmail.trim())
+          .single();
+        
+        if (tenantProfile) {
+          tenantUserId = tenantProfile.user_id;
+          console.log('✅ Found existing tenant user by email:', tenantUserId);
+        } else {
+          console.log('ℹ️ No registered user found for tenant email:', tenantEmail);
+        }
+      }
+
+      // 3. Preparar payload de la propiedad
       const payload = {
         owner_id: user.id,
         address: address.trim(),
@@ -136,7 +155,7 @@ export default function NewPropertyPage() {
         department,
         city,
         is_rented: isRented,
-        tenant_id: isRented && selectedTenantId ? selectedTenantId : null,
+        tenant_id: tenantUserId,
         tenant_name: isRented ? tenantName.trim() : null,
         tenant_email: isRented ? tenantEmail.trim() : null,
         tenant_phone: isRented ? tenantPhone.trim() : null,
@@ -144,7 +163,7 @@ export default function NewPropertyPage() {
         contract_end: isRented && contractEnd ? contractEnd : null,
       };
 
-      // 3. Insert en Supabase
+      // 4. Insert en Supabase
       const { error } = await supabase.from('properties').insert([payload]);
 
       if (error) {
@@ -154,7 +173,7 @@ export default function NewPropertyPage() {
         return;
       }
 
-      // 4. Send welcome email to tenant if property is rented and tenant email exists
+      // 5. Send welcome email to tenant if property is rented and tenant email exists
       if (isRented && tenantEmail && tenantEmail.trim()) {
         try {
           // Fetch owner profile to include in email
