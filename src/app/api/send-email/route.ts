@@ -156,7 +156,7 @@ export async function POST(request: Request) {
             
             <div class="footer">
               <p style="margin: 0 0 10px 0;">KeyhomeKey - Tu hogar, más inteligente</p>
-              <p style="margin: 0;">© 2026 KeyhomeKey. Todos los derechos reservados.</p>
+              <p style="margin: 0;">© ${new Date().getFullYear()} KeyhomeKey. Todos los derechos reservados.</p>
               <p style="margin: 10px 0 0 0; color: #9ca3af;">Este es un correo automático. Por favor no respondas a este mensaje.</p>
             </div>
           </div>
