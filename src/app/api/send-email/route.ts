@@ -1,64 +1,43 @@
-import { Resend } from 'resend';
-import { NextResponse } from 'next/server';
+const emailTemplates = {
+    invitation: `
+    <div style='font-family: Arial, sans-serif;'>
+        <h1>You're Invited!</h1>
+        <p>We are pleased to invite you to our platform. Here are some details:</p>
+        <ul>
+            <li><strong>Event:</strong> {{event}}</li>
+            <li><strong>Date:</strong> {{date}}</li>
+            <li><strong>Location:</strong> {{location}}</li>
+        </ul>
+        <p>Please click <a href='{{link}}'>here</a> to accept the invitation.</p>
+    </div>`,
 
-// Inicializamos Resend dentro del handler para asegurar que lea la variable en cada petición
-export async function POST(request: Request) {
-  try {
-    // 1. Leer la API Key fresca
-    const apiKey = process.env.RESEND_API_KEY;
+    tenantInvitation: `
+    <div style='font-family: Arial, sans-serif;'>
+        <h1>Welcome to Your New Home!</h1>
+        <p>Dear Tenant,</p>
+        <p>We are excited to invite you to join the KeyhomeKey community! Below are the details of your new property:</p>
+        <h2>Property Details</h2>
+        <ul>
+            <li><strong>Property Address:</strong> {{propertyAddress}}</li>
+            <li><strong>Owner's Name:</strong> {{ownerName}}</li>
+            <li><strong>Contact Number:</strong> {{ownerContact}}</li>
+        </ul>
+        <h2>Setup Instructions</h2>
+        <p>To get started, please follow these instructions:</p>
+        <ol>
+            <li>Check your email for confirmation.</li>
+            <li>Visit our website to complete your profile.</li>
+            <li>Contact your property owner if you have any questions.</li>
+        </ol>
+        <h2>KeyhomeKey Benefits</h2>
+        <ul>
+            <li>Seamless communication with your landlord.</li>
+            <li>Easy access to property management services.</li>
+            <li>Exclusive offers and discounts for tenants.</li>
+        </ul>
+        <p>If you have any questions, feel free to reach out!</p>
+        <p>Best Regards,<br/>The KeyhomeKey Team</p>
+    </div>`,
+};
 
-    if (!apiKey) {
-      console.error("❌ ERROR CRÍTICO: No se encontró RESEND_API_KEY en las variables de entorno.");
-      // Devolvemos un error con estructura estándar { message: ... }
-      return NextResponse.json({ 
-        success: false, 
-        error: { message: 'Falta la configuración de API Key en el servidor (Revisa .env.local)' } 
-      }, { status: 500 });
-    }
-
-    const resend = new Resend(apiKey);
-    const body = await request.json();
-    const { email, name, type } = body;
-
-    let subject = 'Notificación KeyhomeKey';
-    let htmlContent = '<p>Hola</p>';
-
-    if (type === 'invitation') {
-      subject = 'Bienvenido a tu nuevo hogar en KeyhomeKey 🏠';
-      htmlContent = `
-        <div style="font-family: sans-serif; color: #333;">
-          <h1>¡Hola ${name}!</h1>
-          <p>Tu arrendador te ha invitado a gestionar tu hogar de forma inteligente con <strong>KeyhomeKey</strong>.</p>
-          <p>Para comenzar, por favor ingresa al portal:</p>
-          <br/>
-          <a href="https://keyhomekey.com/registro" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Ingresar ahora</a>
-        </div>
-      `;
-    }
-
-    // 2. Intentar enviar el correo
-    const data = await resend.emails.send({
-      from: 'KeyhomeKey <info@keyhomekey.com>',
-      to: [email],
-      subject: subject,
-      html: htmlContent,
-    });
-
-    // 3. Manejo de errores de Resend
-    if (data.error) {
-      console.error("❌ Error devuelto por Resend:", data.error);
-      return NextResponse.json({ success: false, error: data.error }, { status: 400 });
-    }
-
-    console.log("✅ Correo enviado con éxito ID:", data.data?.id);
-    return NextResponse.json({ success: true, data });
-
-  } catch (error: any) {
-    console.error("❌ Error inesperado en el servidor:", error);
-    // Convertimos cualquier error extraño en un objeto estándar
-    return NextResponse.json({ 
-      success: false, 
-      error: { message: error.message || 'Error interno del servidor' } 
-    }, { status: 500 });
-  }
-}
+export default emailTemplates;
