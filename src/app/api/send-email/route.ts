@@ -195,12 +195,13 @@ export async function POST(request: Request) {
     console.log("✅ Correo enviado con éxito ID:", data.data?.id);
     return NextResponse.json({ success: true, data });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ Error inesperado en el servidor:", error);
     // Convertimos cualquier error extraño en un objeto estándar
+    const errorMessage = error instanceof Error ? error.message : 'Error interno del servidor';
     return NextResponse.json({ 
       success: false, 
-      error: { message: error.message || 'Error interno del servidor' } 
+      error: { message: errorMessage } 
     }, { status: 500 });
   }
 }
