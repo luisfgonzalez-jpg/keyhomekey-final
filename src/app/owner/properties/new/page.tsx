@@ -36,7 +36,6 @@ export default function NewPropertyPage() {
   const [tenantSelectionMode, setTenantSelectionMode] = useState<'manual' | 'existing'>('manual');
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [availableTenants, setAvailableTenants] = useState<TenantUser[]>([]);
-  const [tenantSearchQuery, setTenantSearchQuery] = useState('');
   const [loadingTenants, setLoadingTenants] = useState(false);
 
   const router = useRouter();
@@ -371,17 +370,11 @@ export default function NewPropertyPage() {
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
                     >
                       <option value="">-- Selecciona un inquilino --</option>
-                      {availableTenants
-                        .filter(t => 
-                          !tenantSearchQuery || 
-                          t.name.toLowerCase().includes(tenantSearchQuery.toLowerCase()) ||
-                          t.email.toLowerCase().includes(tenantSearchQuery.toLowerCase())
-                        )
-                        .map((tenant) => (
-                          <option key={tenant.user_id} value={tenant.user_id}>
-                            {tenant.name} ({tenant.email})
-                          </option>
-                        ))}
+                      {availableTenants.map((tenant) => (
+                        <option key={tenant.user_id} value={tenant.user_id}>
+                          {tenant.name} ({tenant.email})
+                        </option>
+                      ))}
                     </select>
                   )}
                 </div>
