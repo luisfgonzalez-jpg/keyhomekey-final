@@ -77,7 +77,7 @@ export async function POST(request: Request) {
             </div>
             
             <div class="content">
-              <p>Hola <strong>${propertyData.tenant_name || 'valued tenant'}</strong>,</p>
+              <p>Hola <strong>${propertyData.tenant_name || 'estimado inquilino'}</strong>,</p>
               
               <p>Te damos la bienvenida a <strong>KeyhomeKey</strong>, la plataforma que hace el arriendo más fácil, seguro y transparente para todos.</p>
               
@@ -110,8 +110,8 @@ export async function POST(request: Request) {
                 <h2 style="margin-top: 0; color: #4F46E5;">Primeros Pasos</h2>
                 <div class="steps">
                   <ol>
-                    <li><strong>Accede a tu Portal:</strong> Click en el botón abajo</li>
-                    <li><strong>Verifica tu Email:</strong> Usa tu correo registrado: <strong>${propertyData.tenant_email || body.email}</strong></li>
+                    <li><strong>Accede a tu Portal:</strong> Haz clic en el botón abajo</li>
+                    <li><strong>Verifica tu Email:</strong> Usa tu correo registrado: <strong>${propertyData.tenant_email || email}</strong></li>
                     <li><strong>Ingresa tu Contraseña:</strong> Usa la contraseña que estableciste</li>
                     <li><strong>Explora tu Dashboard:</strong> Verás tu inmueble en "Mis Inmuebles"</li>
                     <li><strong>Crea tu Primer Ticket:</strong> Si algo necesita reparación, reporta con fotos y descripción</li>
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
                 <ol>
                   <li>Ve a "Mis Inmuebles" en tu dashboard</li>
                   <li>Selecciona tu propiedad</li>
-                  <li>Click en "Crear Ticket"</li>
+                  <li>Haz clic en "Crear Ticket"</li>
                   <li>Describe el problema (ej: "Fuga de agua en la cocina")</li>
                   <li>Adjunta fotos claras del problema</li>
                   <li>Selecciona la prioridad (Baja, Media, Alta)</li>
