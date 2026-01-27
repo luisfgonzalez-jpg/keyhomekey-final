@@ -135,18 +135,19 @@ export default function NewPropertyPage() {
           // Existing tenant mode: use the selected tenant ID
           tenantUserId = selectedTenantId;
         } else if (tenantEmail) {
-          // Manual mode: try to find tenant by email in profiles
-          const { data: tenantProfile } = await supabase
+          // Manual mode: try to find tenant by email in profiles (case-insensitive)
+          const { data: tenantProfile, error: tenantError } = await supabase
             .from('users_profiles')
             .select('user_id')
-            .eq('email', tenantEmail.trim())
+            .ilike('email', tenantEmail.trim())
             .single();
           
-          if (tenantProfile) {
+          if (tenantError && tenantError.code !== 'PGRST116') {
+            // PGRST116 is "no rows returned" - that's OK, just means tenant not registered
+            // Other errors should be logged
+            console.error('Error looking up tenant by email:', tenantError);
+          } else if (tenantProfile) {
             tenantUserId = tenantProfile.user_id;
-            console.log('✅ Found existing tenant user by email:', tenantUserId);
-          } else {
-            console.log('ℹ️ No registered user found for tenant email:', tenantEmail);
           }
         }
       }
