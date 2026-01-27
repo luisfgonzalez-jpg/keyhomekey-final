@@ -94,6 +94,7 @@ interface UserProfile {
 interface Property {
   id: string;
   owner_id?: string;
+  owner_name?: string;
   address: string;
   type: string;
   department: string;
@@ -1170,6 +1171,25 @@ export default function HomePage() {
           .or(`tenant_id.eq.${user.id},tenant_email.eq.${user.email}`)
           .order('created_at', { ascending: false });
         propsData = (data || []) as Property[];
+        
+        // Fetch owner names for tenant properties
+        if (propsData.length > 0) {
+          const ownerIds = propsData.map(p => p.owner_id).filter(Boolean) as string[];
+          if (ownerIds.length > 0) {
+            const { data: ownerProfiles } = await supabase
+              .from('users_profiles')
+              .select('user_id, name')
+              .in('user_id', ownerIds);
+            
+            if (ownerProfiles) {
+              const ownerMap = new Map(ownerProfiles.map(o => [o.user_id, o.name]));
+              propsData = propsData.map(p => ({
+                ...p,
+                owner_name: p.owner_id ? ownerMap.get(p.owner_id) : undefined
+              }));
+            }
+          }
+        }
       }
 
       setProperties(propsData);
@@ -1838,7 +1858,9 @@ export default function HomePage() {
             </div>
 
             {properties.length === 0 ? (
-              <p className="text-xs text-slate-500">Aún no hay inmuebles registrados.</p>
+              <p className="text-xs text-slate-500">
+                {userRole === 'TENANT' ? 'Aún no hay inmuebles asignados.' : 'Aún no hay inmuebles registrados.'}
+              </p>
             ) : (
               <div className="space-y-3">
                 {properties.map((p) => (
@@ -1892,7 +1914,9 @@ export default function HomePage() {
               </div>
 
               {properties.length === 0 ? (
-                <p className="text-sm text-[#64748B]">Aún no hay inmuebles registrados.</p>
+                <p className="text-sm text-[#64748B]">
+                  {userRole === 'TENANT' ? 'Aún no hay inmuebles asignados.' : 'Aún no hay inmuebles registrados.'}
+                </p>
               ) : (
                 <div className="space-y-3">
                   {properties.map((p) => (
@@ -1900,17 +1924,40 @@ export default function HomePage() {
                       <div>
                         <p className="text-sm font-semibold text-[#1E293B]">{p.address}</p>
                         <p className="text-xs text-[#64748B]">{p.municipality}, {p.department} · {p.type}</p>
-                        {p.is_rented && p.tenant_name && (
+                        {userRole === 'TENANT' && p.owner_name && (
+                          <p className="text-xs text-[#64748B] mt-1 flex items-center gap-1">
+                            <UserIcon size={12} />
+                            Propietario: {p.owner_name}
+                          </p>
+                        )}
+                        {userRole === 'OWNER' && p.is_rented && p.tenant_name && (
                           <p className="text-xs text-[#64748B] mt-1 flex items-center gap-1">
                             <UserIcon size={12} />
                             Inquilino: {p.tenant_name}
                           </p>
                         )}
+                        {userRole === 'TENANT' && p.contract_start_date && p.contract_end_date && (
+                          <p className="text-xs text-[#64748B] mt-1 flex items-center gap-1">
+                            <Calendar size={12} />
+                            Contrato: {new Date(p.contract_start_date).toLocaleDateString('es-CO')} - {new Date(p.contract_end_date).toLocaleDateString('es-CO')}
+                          </p>
+                        )}
                       </div>
                       <div className="flex flex-col items-end gap-2">
-                        <span className={`text-xs px-2 py-1 rounded-full ${p.is_rented ? 'bg-[#D1FAE5] text-[#065F46]' : 'bg-[#F1F5F9] text-[#64748B]'}`}>
-                          {p.is_rented ? 'Arrendado' : 'Disponible'}
-                        </span>
+                        {userRole === 'TENANT' && p.contract_end_date && (
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            new Date(p.contract_end_date) > new Date() 
+                              ? 'bg-[#D1FAE5] text-[#065F46]' 
+                              : 'bg-[#FEE2E2] text-[#991B1B]'
+                          }`}>
+                            {new Date(p.contract_end_date) > new Date() ? 'Activo' : 'Vencido'}
+                          </span>
+                        )}
+                        {userRole === 'OWNER' && (
+                          <span className={`text-xs px-2 py-1 rounded-full ${p.is_rented ? 'bg-[#D1FAE5] text-[#065F46]' : 'bg-[#F1F5F9] text-[#64748B]'}`}>
+                            {p.is_rented ? 'Arrendado' : 'Disponible'}
+                          </span>
+                        )}
                         {userRole === 'OWNER' && p.is_rented && (
                           <Button variant="outline" className="text-xs h-7 px-2">
                             Cambiar Inquilino
