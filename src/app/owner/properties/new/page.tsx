@@ -128,21 +128,26 @@ export default function NewPropertyPage() {
       }
 
       // 2. Look up tenant_id if manual mode with email provided
-      let tenantUserId = selectedTenantId;
+      let tenantUserId = null;
       
-      if (isRented && tenantEmail && !selectedTenantId) {
-        // Manual mode: try to find tenant by email in profiles
-        const { data: tenantProfile } = await supabase
-          .from('users_profiles')
-          .select('user_id')
-          .eq('email', tenantEmail.trim())
-          .single();
-        
-        if (tenantProfile) {
-          tenantUserId = tenantProfile.user_id;
-          console.log('✅ Found existing tenant user by email:', tenantUserId);
-        } else {
-          console.log('ℹ️ No registered user found for tenant email:', tenantEmail);
+      if (isRented) {
+        if (selectedTenantId) {
+          // Existing tenant mode: use the selected tenant ID
+          tenantUserId = selectedTenantId;
+        } else if (tenantEmail) {
+          // Manual mode: try to find tenant by email in profiles
+          const { data: tenantProfile } = await supabase
+            .from('users_profiles')
+            .select('user_id')
+            .eq('email', tenantEmail.trim())
+            .single();
+          
+          if (tenantProfile) {
+            tenantUserId = tenantProfile.user_id;
+            console.log('✅ Found existing tenant user by email:', tenantUserId);
+          } else {
+            console.log('ℹ️ No registered user found for tenant email:', tenantEmail);
+          }
         }
       }
 
