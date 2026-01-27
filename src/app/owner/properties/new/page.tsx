@@ -154,6 +154,57 @@ export default function NewPropertyPage() {
         return;
       }
 
+      // 4. Send welcome email to tenant if property is rented and tenant email exists
+      if (isRented && tenantEmail && tenantEmail.trim()) {
+        try {
+          // Fetch owner profile to include in email
+          const { data: ownerProfile, error: profileError } = await supabase
+            .from('users_profiles')
+            .select('name, email, phone')
+            .eq('user_id', user.id)
+            .single();
+
+          if (profileError) {
+            console.error('⚠️ Error al obtener perfil del propietario:', profileError);
+          }
+
+          const emailResponse = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: tenantEmail.trim(),
+              name: tenantName.trim(),
+              type: 'tenant-invitation',
+              propertyData: {
+                address: address.trim(),
+                property_type: propertyType,
+                owner_name: ownerProfile?.name || 'Propietario',
+                owner_email: ownerProfile?.email,
+                owner_phone: ownerPhone.trim(),
+                contract_start: contractStart,
+                contract_end: contractEnd,
+                city: city,
+                department: department,
+              },
+            }),
+          });
+
+          const emailResult = await emailResponse.json();
+          
+          if (emailResult.success) {
+            console.log('✅ Email de bienvenida enviado al inquilino');
+          } else {
+            console.error('⚠️ No se pudo enviar el email al inquilino:', emailResult.error);
+            // Don't fail property creation if email fails
+          }
+        } catch (emailError) {
+          console.error('⚠️ Error enviando email al inquilino:', emailError);
+          // Don't fail property creation if email fails
+        }
+      }
+
       alert('Propiedad guardada correctamente ✅');
       router.push('/owner/properties');
     } catch (err) {
