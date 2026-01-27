@@ -100,6 +100,7 @@ interface Property {
   municipality: string;
   owner_phone?: string;
   is_rented: boolean;
+  tenant_id?: string;
   tenant_name?: string;
   tenant_email?: string;
   tenant_phone?: string;
@@ -1122,10 +1123,11 @@ export default function HomePage() {
       }
 
       if (!role) {
+        // Check if user is tenant by ID or email
         const { data: tenantProps } = await supabase
           .from('properties')
           .select('id')
-          .eq('tenant_email', user.email)
+          .or(`tenant_id.eq.${user.id},tenant_email.eq.${user.email}`)
           .limit(1);
 
         role = tenantProps && tenantProps.length > 0 ? 'TENANT' : 'OWNER';
@@ -1161,7 +1163,12 @@ export default function HomePage() {
         const { data } = await supabase.from('properties').select('*').eq('owner_id', user.id).order('created_at', { ascending: false });
         propsData = (data || []) as Property[];
       } else if (role === 'TENANT') {
-        const { data } = await supabase.from('properties').select('*').eq('tenant_email', user.email).order('created_at', { ascending: false });
+        // Check for properties where user is tenant by ID or email
+        const { data } = await supabase
+          .from('properties')
+          .select('*')
+          .or(`tenant_id.eq.${user.id},tenant_email.eq.${user.email}`)
+          .order('created_at', { ascending: false });
         propsData = (data || []) as Property[];
       }
 
@@ -2635,9 +2642,11 @@ export default function HomePage() {
               </div>
               <div className="flex items-center gap-2">
                 {!isEditMode && (() => {
-                  // Check if user can edit: owner, tenant, or admin
+                  // Check if user can edit: owner, tenant (by ID or email), or admin
                   const isOwner = ticketProperty?.owner_id === session?.user?.id;
-                  const isTenant = ticketProperty?.tenant_email === session?.user?.email;
+                  const isTenantById = ticketProperty?.tenant_id === session?.user?.id;
+                  const isTenantByEmail = ticketProperty?.tenant_email === session?.user?.email;
+                  const isTenant = isTenantById || isTenantByEmail;
                   const isAdmin = userRole === 'ADMIN' || 
                     (session?.user as any)?.user_metadata?.role?.toUpperCase() === 'ADMIN' ||
                     (session?.user as any)?.app_metadata?.role?.toUpperCase() === 'ADMIN';

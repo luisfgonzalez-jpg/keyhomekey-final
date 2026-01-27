@@ -134,10 +134,10 @@ export async function PATCH(
       );
     }
 
-    // Query property to get owner_id and tenant_email
+    // Query property to get owner_id, tenant_id, and tenant_email
     const { data: property, error: propertyError } = await supabase
       .from('properties')
-      .select('owner_id, tenant_email')
+      .select('owner_id, tenant_id, tenant_email')
       .eq('id', ticket.property_id)
       .single();
 
@@ -149,10 +149,12 @@ export async function PATCH(
       );
     }
 
-    // Authorization check: admin, owner, or tenant
+    // Authorization check: admin, owner, or tenant (by ID or email)
     const isAdmin = userRole.toUpperCase() === 'ADMIN';
     const isOwner = property.owner_id === user.id;
-    const isTenant = property.tenant_email === user.email;
+    const isTenantById = property.tenant_id === user.id;
+    const isTenantByEmail = property.tenant_email === user.email;
+    const isTenant = isTenantById || isTenantByEmail;
 
     if (!isAdmin && !isOwner && !isTenant) {
       return NextResponse.json(
