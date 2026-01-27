@@ -205,6 +205,8 @@ export default function NewPropertyPage() {
               propertyData: {
                 address: address.trim(),
                 property_type: propertyType,
+                tenant_name: tenantName.trim(),
+                tenant_email: tenantEmail.trim(),
                 owner_name: ownerProfile?.name || 'Propietario',
                 owner_email: ownerProfile?.email,
                 owner_phone: ownerPhone.trim(),

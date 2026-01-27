@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
     const resend = new Resend(apiKey);
     const body = await request.json();
-    const { email, name, type, propertyData } = body;
+    const { email, name, type } = body;
 
     // Get site URL from environment or use default
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://keyhomekey-final-git-development-keyHomeKey.vercel.app';
@@ -39,143 +39,126 @@ export async function POST(request: Request) {
         </div>
       `;
     } else if (type === 'tenant-invitation') {
-      subject = '¡Bienvenido a tu nuevo hogar en KeyhomeKey! 🏠';
+      const propertyData = body.propertyData || {};
       
-      const contractStartFormatted = propertyData?.contract_start 
-        ? new Date(propertyData.contract_start).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
-        : 'No especificada';
-      const contractEndFormatted = propertyData?.contract_end
-        ? new Date(propertyData.contract_end).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
-        : 'No especificada';
-
+      subject = `¡Bienvenido a tu nuevo hogar en KeyhomeKey! 🏠`;
+      
       htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; }
+            .container { max-width: 600px; margin: 0 auto; background: #f9fafb; }
+            .header { background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .header h1 { margin: 0; font-size: 28px; }
+            .content { padding: 40px 20px; }
+            .section { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #4F46E5; }
+            .property-card { background: #f0f4ff; padding: 15px; border-radius: 6px; margin: 15px 0; }
+            .property-card p { margin: 8px 0; }
+            .steps { background: #f9fafb; padding: 20px; border-radius: 6px; }
+            .steps ol { padding-left: 20px; }
+            .steps li { margin: 10px 0; }
+            .cta-button { display: inline-block; background: #4F46E5; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; text-align: center; margin: 20px 0; }
+            .footer { background: #f3f4f6; padding: 20px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 8px 8px; }
+            .highlight { background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 15px; border-radius: 4px; margin: 20px 0; }
+            .benefit-list { list-style: none; padding: 0; }
+            .benefit-list li { padding: 10px 0; padding-left: 30px; position: relative; }
+            .benefit-list li:before { content: "✓"; position: absolute; left: 0; color: #10b981; font-weight: bold; }
+          </style>
         </head>
-        <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-            
-            <!-- Header -->
-            <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 20px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">¡Bienvenido a KeyhomeKey! 🏠</h1>
-              <p style="color: #cbd5e1; margin: 10px 0 0 0; font-size: 16px;">Tu plataforma de gestión inmobiliaria</p>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>¡Bienvenido a KeyhomeKey! 🏠</h1>
+              <p>Tu plataforma inteligente para gestionar el arriendo</p>
             </div>
-
-            <!-- Content -->
-            <div style="padding: 40px 30px;">
+            
+            <div class="content">
+              <p>Hola <strong>${propertyData.tenant_name || 'estimado inquilino'}</strong>,</p>
               
-              <!-- Greeting -->
-              <h2 style="color: #1e293b; font-size: 24px; margin: 0 0 20px 0;">¡Hola ${name}!</h2>
+              <p>Te damos la bienvenida a <strong>KeyhomeKey</strong>, la plataforma que hace el arriendo más fácil, seguro y transparente para todos.</p>
               
-              <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                Tu propietario te ha dado la bienvenida a <strong>KeyhomeKey</strong>, la plataforma que facilita 
-                la comunicación y gestión de mantenimiento de tu nuevo hogar.
-              </p>
-
-              <!-- Property Details -->
-              <div style="background-color: #f1f5f9; border-left: 4px solid #3b82f6; padding: 20px; margin: 30px 0; border-radius: 4px;">
-                <h3 style="color: #1e293b; font-size: 18px; margin: 0 0 15px 0;">📍 Detalles de tu Propiedad</h3>
-                <table style="width: 100%; border-collapse: collapse;">
-                  <tr>
-                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; font-weight: 600;">Dirección:</td>
-                    <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">${propertyData?.address || 'No especificada'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; font-weight: 600;">Tipo:</td>
-                    <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">${propertyData?.property_type || 'No especificado'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; font-weight: 600;">Ubicación:</td>
-                    <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">${propertyData?.city || ''}, ${propertyData?.department || ''}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; font-weight: 600;">Propietario:</td>
-                    <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">${propertyData?.owner_name || 'No especificado'}</td>
-                  </tr>
-                  ${propertyData?.owner_phone ? `
-                  <tr>
-                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; font-weight: 600;">Teléfono:</td>
-                    <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">${propertyData.owner_phone}</td>
-                  </tr>
-                  ` : ''}
-                  <tr>
-                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; font-weight: 600;">Inicio de contrato:</td>
-                    <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">${contractStartFormatted}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; font-weight: 600;">Fin de contrato:</td>
-                    <td style="padding: 8px 0; color: #1e293b; font-size: 14px;">${contractEndFormatted}</td>
-                  </tr>
-                </table>
+              <div class="section">
+                <h2 style="margin-top: 0; color: #4F46E5;">Tu Inmueble Asignado</h2>
+                <div class="property-card">
+                  <p><strong>📍 Dirección:</strong> ${propertyData.address || 'N/A'}</p>
+                  <p><strong>🏢 Tipo de Inmueble:</strong> ${propertyData.property_type || 'N/A'}</p>
+                  <p><strong>👤 Propietario:</strong> ${propertyData.owner_name || 'N/A'}</p>
+                  ${propertyData.owner_phone ? `<p><strong>📞 Contacto Propietario:</strong> ${propertyData.owner_phone}</p>` : ''}
+                  ${propertyData.contract_start && propertyData.contract_end ? `<p><strong>📅 Período de Arriendo:</strong> ${propertyData.contract_start} a ${propertyData.contract_end}</p>` : ''}
+                  ${propertyData.city && propertyData.department ? `<p><strong>📌 Ubicación:</strong> ${propertyData.city}, ${propertyData.department}</p>` : ''}
+                </div>
               </div>
-
-              <!-- What is KeyhomeKey -->
-              <div style="margin: 30px 0;">
-                <h3 style="color: #1e293b; font-size: 18px; margin: 0 0 15px 0;">🔑 ¿Qué es KeyhomeKey?</h3>
-                <p style="color: #475569; font-size: 15px; line-height: 1.6; margin: 0 0 10px 0;">
-                  KeyhomeKey es tu plataforma de gestión inmobiliaria que te permite:
-                </p>
-                <ul style="color: #475569; font-size: 15px; line-height: 1.8; margin: 10px 0; padding-left: 20px;">
-                  <li>✅ Ver la información de tu propiedad asignada</li>
-                  <li>🔧 Crear tickets de mantenimiento fácilmente</li>
-                  <li>💬 Comunicarte directamente con tu propietario y proveedores</li>
-                  <li>📱 Gestionar todo desde cualquier dispositivo</li>
-                  <li>🌐 Soporte en español</li>
+              
+              <div class="section">
+                <h2 style="margin-top: 0; color: #4F46E5;">¿Qué es KeyhomeKey?</h2>
+                <p>KeyhomeKey es la plataforma inteligente que conecta a propietarios e inquilinos para hacer el arriendo más fácil:</p>
+                <ul class="benefit-list">
+                  <li><strong>Reporta Mantenimiento:</strong> Crea tickets con fotos en segundos sin burocracia</li>
+                  <li><strong>Seguimiento en Tiempo Real:</strong> Ve el estado de tus solicitudes en todo momento</li>
+                  <li><strong>Comunicación Directa:</strong> Habla con tu propietario y proveedores en un solo lugar</li>
+                  <li><strong>Proveedores Verificados:</strong> Acceso a profesionales cualificados para reparaciones</li>
+                  <li><strong>Seguridad y Transparencia:</strong> Historial completo de todas las transacciones</li>
+                  <li><strong>Disponible 24/7:</strong> Gestiona todo desde tu teléfono o computador</li>
                 </ul>
               </div>
-
-              <!-- Instructions -->
-              <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 20px; margin: 30px 0; border-radius: 4px;">
-                <h3 style="color: #1e293b; font-size: 18px; margin: 0 0 15px 0;">🚀 Cómo empezar</h3>
-                <ol style="color: #475569; font-size: 15px; line-height: 1.8; margin: 0; padding-left: 20px;">
-                  <li>Haz clic en el botón de abajo para acceder al portal</li>
-                  <li>Inicia sesión con tu correo electrónico: <strong>${email}</strong></li>
-                  <li>Ve a la sección "Mis inmuebles" para ver tu propiedad asignada</li>
-                  <li>Crea tickets de mantenimiento cuando lo necesites</li>
-                </ol>
+              
+              <div class="section">
+                <h2 style="margin-top: 0; color: #4F46E5;">Primeros Pasos</h2>
+                <div class="steps">
+                  <ol>
+                    <li><strong>Accede a tu Portal:</strong> Haz clic en el botón abajo</li>
+                    <li><strong>Verifica tu Email:</strong> Usa tu correo registrado: <strong>${propertyData.tenant_email || email}</strong></li>
+                    <li><strong>Ingresa tu Contraseña:</strong> Usa la contraseña que estableciste</li>
+                    <li><strong>Explora tu Dashboard:</strong> Verás tu inmueble en "Mis Inmuebles"</li>
+                    <li><strong>Crea tu Primer Ticket:</strong> Si algo necesita reparación, reporta con fotos y descripción</li>
+                    <li><strong>¡Listo!</strong> Tu propietario y los proveedores recibirán notificación automática</li>
+                  </ol>
+                </div>
               </div>
-
-              <!-- CTA Button -->
-              <div style="text-align: center; margin: 40px 0;">
-                <a href="${loginUrl}" 
-                   style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
-                  Ingresar a KeyhomeKey →
+              
+              <div style="text-align: center;">
+                <a href="${loginUrl}" class="cta-button">
+                  Acceder a mi Portal
                 </a>
               </div>
-
-              <!-- How to report issues -->
-              <div style="margin: 30px 0; padding: 20px; background-color: #fef3c7; border-radius: 4px; border-left: 4px solid #f59e0b;">
-                <h3 style="color: #1e293b; font-size: 16px; margin: 0 0 10px 0;">💡 ¿Cómo reportar problemas de mantenimiento?</h3>
-                <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0;">
-                  Simplemente ingresa a la plataforma, selecciona tu propiedad, y crea un nuevo ticket 
-                  describiendo el problema. Puedes adjuntar fotos y el propietario recibirá la notificación 
-                  de inmediato. ¡Es así de fácil!
-                </p>
+              
+              <div class="section">
+                <h2 style="margin-top: 0; color: #4F46E5;">¿Cómo Reportar un Problema?</h2>
+                <ol>
+                  <li>Ve a "Mis Inmuebles" en tu dashboard</li>
+                  <li>Selecciona tu propiedad</li>
+                  <li>Haz clic en "Crear Ticket"</li>
+                  <li>Describe el problema (ej: "Fuga de agua en la cocina")</li>
+                  <li>Adjunta fotos claras del problema</li>
+                  <li>Selecciona la prioridad (Baja, Media, Alta)</li>
+                  <li>¡Envía! Tu propietario será notificado al instante</li>
+                </ol>
               </div>
-
-              <!-- Support -->
-              <div style="margin: 30px 0 0 0; padding-top: 20px; border-top: 1px solid #e2e8f0;">
-                <p style="color: #64748b; font-size: 14px; line-height: 1.6; margin: 0;">
-                  <strong>¿Necesitas ayuda?</strong><br>
-                  Contáctanos en <a href="mailto:info@keyhomekey.com" style="color: #3b82f6; text-decoration: none;">info@keyhomekey.com</a>
-                </p>
+              
+              <div class="highlight">
+                <p><strong>💡 Consejo Importante:</strong> Guarda este correo. Aquí tienes toda la información de tu inmueble y el enlace de acceso. Si olvidas tu contraseña, podrás recuperarla desde la página de login.</p>
               </div>
-
+              
+              <div class="section">
+                <h2 style="margin-top: 0; color: #4F46E5;">¿Preguntas o Problemas?</h2>
+                <p>Estamos aquí para ayudarte:</p>
+                <ul>
+                  <li><strong>Email de Soporte:</strong> <a href="mailto:info@keyhomekey.com">info@keyhomekey.com</a></li>
+                  <li><strong>Portal de Ayuda:</strong> Accede a tu cuenta y consulta el centro de soporte</li>
+                  <li><strong>Contacto Propietario:</strong> ${propertyData.owner_phone || 'Disponible en tu perfil'}</li>
+                </ul>
+              </div>
             </div>
-
-            <!-- Footer -->
-            <div style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="color: #64748b; font-size: 13px; margin: 0 0 10px 0;">
-                © ${new Date().getFullYear()} KeyhomeKey - Plataforma de Gestión Inmobiliaria
-              </p>
-              <p style="color: #94a3b8; font-size: 12px; margin: 0;">
-                Este correo fue enviado porque tu propietario te asignó una propiedad en KeyhomeKey.
-              </p>
+            
+            <div class="footer">
+              <p style="margin: 0 0 10px 0;">KeyhomeKey - Tu hogar, más inteligente</p>
+              <p style="margin: 0;">© ${new Date().getFullYear()} KeyhomeKey. Todos los derechos reservados.</p>
+              <p style="margin: 10px 0 0 0; color: #9ca3af;">Este es un correo automático. Por favor no respondas a este mensaje.</p>
             </div>
-
           </div>
         </body>
         </html>
