@@ -12,6 +12,9 @@ type Property = {
   department: string | null;
   property_type: string | null;
   is_rented: boolean | null;
+  tenant_id: string | null;
+  tenant_name: string | null;
+  tenant_email: string | null;
 };
 
 export default function OwnerPropertiesPage() {
@@ -45,7 +48,7 @@ export default function OwnerPropertiesPage() {
 
       const { data, error } = await supabase
         .from('properties')
-        .select('id, address, city, department, property_type, is_rented')
+        .select('id, address, city, department, property_type, is_rented, tenant_id, tenant_name, tenant_email')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -112,6 +115,11 @@ export default function OwnerPropertiesPage() {
               <p className="mt-1 text-xs text-slate-500">
                 {p.property_type || 'Tipo sin especificar'} ·{' '}
                 {p.is_rented ? 'Arrendado' : 'Disponible'}
+                {p.is_rented && (
+                  p.tenant_id ? 
+                    <span className="ml-1 text-green-600">· Inquilino asignado: {p.tenant_name || p.tenant_email}</span> :
+                    <span className="ml-1 text-amber-600">· Sin inquilino asignado (solo datos de contacto)</span>
+                )}
               </p>
             </li>
           ))}

@@ -11,6 +11,13 @@ type DepartmentOption = {
   ciudades: string[];
 };
 
+type TenantUser = {
+  user_id: string;
+  name: string;
+  email: string;
+  phone: string;
+};
+
 export default function NewPropertyPage() {
   const [address, setAddress] = useState('');
   const [propertyType, setPropertyType] = useState('Apartamento');
@@ -19,14 +26,71 @@ export default function NewPropertyPage() {
   const [city, setCity] = useState('Bogotá D.C.');
   const [isRented, setIsRented] = useState(false);
   const [tenantName, setTenantName] = useState('');
+  const [tenantEmail, setTenantEmail] = useState('');
   const [tenantPhone, setTenantPhone] = useState('');
   const [contractStart, setContractStart] = useState('');
   const [contractEnd, setContractEnd] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // New tenant selection state
+  const [tenantSelectionMode, setTenantSelectionMode] = useState<'manual' | 'existing'>('manual');
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [availableTenants, setAvailableTenants] = useState<TenantUser[]>([]);
+  const [tenantSearchQuery, setTenantSearchQuery] = useState('');
+  const [loadingTenants, setLoadingTenants] = useState(false);
 
   const router = useRouter();
 
   const departments: DepartmentOption[] = colombiaLocations;
+
+  // Load available tenant users when tenant selection mode is 'existing'
+  useEffect(() => {
+    const loadTenantUsers = async () => {
+      if (tenantSelectionMode === 'existing' && isRented) {
+        setLoadingTenants(true);
+        try {
+          // Query users_profiles for users with role TENANT
+          const { data, error } = await supabase
+            .from('users_profiles')
+            .select('user_id, name, email, phone')
+            .eq('role', 'TENANT')
+            .order('name');
+
+          if (error) {
+            console.error('Error loading tenant users:', error);
+          } else {
+            setAvailableTenants(data || []);
+          }
+        } catch (err) {
+          console.error('Unexpected error loading tenants:', err);
+        } finally {
+          setLoadingTenants(false);
+        }
+      }
+    };
+
+    loadTenantUsers();
+  }, [tenantSelectionMode, isRented]);
+
+  // Handle tenant selection from dropdown
+  const handleTenantSelection = (userId: string) => {
+    setSelectedTenantId(userId);
+    const selectedTenant = availableTenants.find(t => t.user_id === userId);
+    if (selectedTenant) {
+      // Auto-fill tenant info from selected user
+      setTenantName(selectedTenant.name);
+      setTenantEmail(selectedTenant.email);
+      setTenantPhone(selectedTenant.phone);
+    }
+  };
+
+  // Clear tenant selection when switching to manual mode
+  const handleSelectionModeChange = (mode: 'manual' | 'existing') => {
+    setTenantSelectionMode(mode);
+    if (mode === 'manual') {
+      setSelectedTenantId(null);
+    }
+  };
 
   // Actualizar ciudades cuando cambie el departamento
   useEffect(() => {
@@ -73,7 +137,9 @@ export default function NewPropertyPage() {
         department,
         city,
         is_rented: isRented,
+        tenant_id: isRented && selectedTenantId ? selectedTenantId : null,
         tenant_name: isRented ? tenantName.trim() : null,
+        tenant_email: isRented ? tenantEmail.trim() : null,
         tenant_phone: isRented ? tenantPhone.trim() : null,
         contract_start: isRented && contractStart ? contractStart : null,
         contract_end: isRented && contractEnd ? contractEnd : null,
@@ -254,31 +320,119 @@ export default function NewPropertyPage() {
           </div>
 
           {isRented && (
+            <>
+              {/* Tenant Selection Mode */}
+              <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <label className="text-xs font-medium text-slate-700">
+                  Método de asignación de inquilino
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectionModeChange('manual')}
+                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                      tenantSelectionMode === 'manual'
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    Ingresar datos manualmente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectionModeChange('existing')}
+                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                      tenantSelectionMode === 'existing'
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    Seleccionar inquilino registrado
+                  </button>
+                </div>
+              </div>
+
+              {/* Existing Tenant Selection */}
+              {tenantSelectionMode === 'existing' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">
+                    Seleccionar inquilino registrado
+                  </label>
+                  {loadingTenants ? (
+                    <p className="text-xs text-slate-500">Cargando inquilinos...</p>
+                  ) : availableTenants.length === 0 ? (
+                    <p className="text-xs text-slate-500">
+                      No hay inquilinos registrados. Usa el modo manual para ingresar los datos.
+                    </p>
+                  ) : (
+                    <select
+                      value={selectedTenantId || ''}
+                      onChange={(e) => handleTenantSelection(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                    >
+                      <option value="">-- Selecciona un inquilino --</option>
+                      {availableTenants
+                        .filter(t => 
+                          !tenantSearchQuery || 
+                          t.name.toLowerCase().includes(tenantSearchQuery.toLowerCase()) ||
+                          t.email.toLowerCase().includes(tenantSearchQuery.toLowerCase())
+                        )
+                        .map((tenant) => (
+                          <option key={tenant.user_id} value={tenant.user_id}>
+                            {tenant.name} ({tenant.email})
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* Manual Tenant Input or Display Selected Tenant Info */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">
+                    Nombre del inquilino
+                  </label>
+                  <input
+                    type="text"
+                    value={tenantName}
+                    onChange={(e) => setTenantName(e.target.value)}
+                    disabled={tenantSelectionMode === 'existing' && !!selectedTenantId}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">
+                    Email del inquilino
+                  </label>
+                  <input
+                    type="email"
+                    value={tenantEmail}
+                    onChange={(e) => setTenantEmail(e.target.value)}
+                    disabled={tenantSelectionMode === 'existing' && !!selectedTenantId}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-700">
+                    Teléfono del inquilino
+                  </label>
+                  <input
+                    type="tel"
+                    value={tenantPhone}
+                    onChange={(e) => setTenantPhone(e.target.value)}
+                    disabled={tenantSelectionMode === 'existing' && !!selectedTenantId}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {isRented && (
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">
-                  Nombre del inquilino
-                </label>
-                <input
-                  type="text"
-                  value={tenantName}
-                  onChange={(e) => setTenantName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-700">
-                  Teléfono del inquilino
-                </label>
-                <input
-                  type="tel"
-                  value={tenantPhone}
-                  onChange={(e) => setTenantPhone(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
-                />
-              </div>
-
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-700">
                   Fecha de inicio del contrato
