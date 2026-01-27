@@ -20,6 +20,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { email, name, type, propertyData } = body;
 
+    // Get site URL from environment or use default
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://keyhomekey-final-git-development-keyHomeKey.vercel.app';
+    const loginUrl = `${siteUrl}/sign-in`;
+
     let subject = 'Notificación KeyhomeKey';
     let htmlContent = '<p>Hola</p>';
 
@@ -136,7 +140,7 @@ export async function POST(request: Request) {
 
               <!-- CTA Button -->
               <div style="text-align: center; margin: 40px 0;">
-                <a href="https://keyhomekey-final-git-development-keyHomeKey.vercel.app/sign-in" 
+                <a href="${loginUrl}" 
                    style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
                   Ingresar a KeyhomeKey →
                 </a>

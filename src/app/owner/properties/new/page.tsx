@@ -158,11 +158,15 @@ export default function NewPropertyPage() {
       if (isRented && tenantEmail && tenantEmail.trim()) {
         try {
           // Fetch owner profile to include in email
-          const { data: ownerProfile } = await supabase
+          const { data: ownerProfile, error: profileError } = await supabase
             .from('users_profiles')
             .select('name, email, phone')
             .eq('user_id', user.id)
             .single();
+
+          if (profileError) {
+            console.error('⚠️ Error al obtener perfil del propietario:', profileError);
+          }
 
           const emailResponse = await fetch('/api/send-email', {
             method: 'POST',
