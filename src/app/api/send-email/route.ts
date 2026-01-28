@@ -279,6 +279,14 @@ export async function POST(request: Request) {
                 { status: 500 }
             );
         }
+
+        // NEW: Validate sender email configuration
+        const fromEmail = process.env.RESEND_FROM_EMAIL || 'delivered@resend.dev';
+
+        if (!process.env.RESEND_FROM_EMAIL) {
+            console.warn('⚠️  RESEND_FROM_EMAIL not configured, using Resend development email (delivered@resend.dev)');
+            console.warn('⚠️  For production, configure a verified domain at https://resend.com/domains');
+        }
         
         // 3. Parse and validate request body
         const body: SendEmailRequest = await request.json();
@@ -328,9 +336,9 @@ export async function POST(request: Request) {
         
         // 6. Initialize Resend and send email
         const resend = new Resend(resendApiKey);
-        
+
         const { data, error } = await resend.emails.send({
-            from: 'KeyHomeKey <onboarding@resend.dev>', // Update with your verified domain
+            from: fromEmail,
             to: [to],
             subject: subject,
             html: emailHtml,
@@ -338,6 +346,10 @@ export async function POST(request: Request) {
         
         if (error) {
             console.error('❌ Resend API error:', error);
+            console.error('📧 Attempted from:', fromEmail);
+            console.error('📧 Recipient:', to);
+            console.error('💡 If you see "Invalid from address", verify your domain at https://resend.com/domains');
+            
             return NextResponse.json(
                 { success: false, error: { message: error.message || 'Failed to send email' } },
                 { status: 500 }
@@ -345,7 +357,11 @@ export async function POST(request: Request) {
         }
         
         // 7. Success response
-        console.log('✅ Email sent successfully:', data?.id);
+        console.log('✅ Email sent successfully');
+        console.log('📧 Email ID:', data?.id);
+        console.log('📧 From:', fromEmail);
+        console.log('📧 To:', to);
+        console.log('📧 Subject:', subject);
         return NextResponse.json({
             success: true,
             data: {
