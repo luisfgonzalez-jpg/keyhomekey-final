@@ -32,6 +32,44 @@ This project requires the following environment variables to be set:
 ### Required for Email Notifications
 
 - `RESEND_API_KEY` - Your Resend API key for sending emails
+- `RESEND_FROM_EMAIL` - (Optional) Sender email address. Defaults to `delivered@resend.dev` if not set
+
+### Email Service (Resend)
+
+KeyHomeKey uses [Resend](https://resend.com) for sending transactional emails.
+
+#### Setup Instructions:
+
+1. **Create a Resend account** at https://resend.com
+2. **Get your API key** from the [API Keys page](https://resend.com/api-keys)
+3. **Configure sender email**:
+
+   **For Development/Testing:**
+   ```bash
+   RESEND_API_KEY=re_your_api_key_here
+   RESEND_FROM_EMAIL=delivered@resend.dev
+   ```
+
+   **For Production:**
+   - Go to [Resend Domains](https://resend.com/domains)
+   - Click "Add Domain" and enter your domain (e.g., `keyhomekey.com`)
+   - Add the provided DNS records to your domain provider
+   - Wait for verification (usually 5-15 minutes)
+   - Use your verified domain in the environment variable:
+   ```bash
+   RESEND_API_KEY=re_your_api_key_here
+   RESEND_FROM_EMAIL=KeyHomeKey <noreply@keyhomekey.com>
+   ```
+
+#### Email Templates Available:
+- `tenantWelcome` - Welcome email sent to new tenants
+- `tenantInvitation` - Property invitation email
+- `invitation` - General invitation email
+
+#### Troubleshooting:
+- **Error 400**: Sender email not verified → Verify domain in Resend dashboard
+- **Error 401**: Invalid API key → Check `RESEND_API_KEY` in environment variables
+- **Emails not arriving**: Check spam folder, verify recipient email format
 
 ### Required for Retel AI Provider Matching
 
@@ -324,11 +362,12 @@ When deploying to Vercel, add the following environment variables in your projec
 1. `NEXT_PUBLIC_SUPABASE_URL`
 2. `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 3. `RESEND_API_KEY`
-4. `RETEL_API_KEY`
-5. `WHATSAPP_TOKEN`
-6. `WHATSAPP_PHONE_NUMBER_ID`
-7. `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
-8. `INTERNAL_API_KEY`
+4. `RESEND_FROM_EMAIL` (Optional, defaults to `delivered@resend.dev`)
+5. `RETEL_API_KEY`
+6. `WHATSAPP_TOKEN`
+7. `WHATSAPP_PHONE_NUMBER_ID`
+8. `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
+9. `INTERNAL_API_KEY`
 
 **Important for WhatsApp Integration on Vercel:**
 - After deployment, update your webhook URL in the Meta Developer Console to point to your Vercel domain
