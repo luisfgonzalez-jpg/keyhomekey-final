@@ -283,7 +283,8 @@ export async function POST(request: Request) {
         // NEW: Validate sender email configuration
         const fromEmail = process.env.RESEND_FROM_EMAIL || 'delivered@resend.dev';
 
-        if (!process.env.RESEND_FROM_EMAIL) {
+        // Log warning only in development mode to avoid log pollution
+        if (!process.env.RESEND_FROM_EMAIL && process.env.NODE_ENV === 'development') {
             console.warn('⚠️  RESEND_FROM_EMAIL not configured, using Resend development email (delivered@resend.dev)');
             console.warn('⚠️  For production, configure a verified domain at https://resend.com/domains');
         }
