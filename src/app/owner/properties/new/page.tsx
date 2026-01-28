@@ -91,14 +91,19 @@ export default function NewPropertyPage() {
       }
 
       // 4. Send welcome email to tenant if property is rented and email is provided
+      let emailSent = false;
       if (isRented && tenantEmail) {
         try {
           // Get owner profile for full name
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('full_name')
             .eq('id', user.id)
             .single();
+
+          if (profileError) {
+            console.error('❌ Error fetching owner profile:', profileError);
+          }
 
           const emailResponse = await fetch('/api/send-email', {
             method: 'POST',
@@ -128,6 +133,7 @@ export default function NewPropertyPage() {
             // No bloquear el flujo si falla el email
           } else {
             console.log('✅ Welcome email sent to tenant');
+            emailSent = true;
           }
         } catch (emailError) {
           console.error('❌ Failed to send welcome email:', emailError);
@@ -135,7 +141,12 @@ export default function NewPropertyPage() {
         }
       }
 
-      alert('Propiedad guardada correctamente ✅');
+      // Show appropriate success message
+      if (isRented && tenantEmail && !emailSent) {
+        alert('Propiedad guardada correctamente ✅\n\nNota: No se pudo enviar el email de bienvenida al inquilino. Por favor, contacta al inquilino manualmente.');
+      } else {
+        alert('Propiedad guardada correctamente ✅');
+      }
       router.push('/owner/properties');
     } catch (err) {
       console.error('Unexpected error saving property:', err);

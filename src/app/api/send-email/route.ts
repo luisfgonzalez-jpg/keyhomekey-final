@@ -67,8 +67,8 @@ const emailTemplates = {
                             <td style="padding: 40px 30px;">
                                 <h2 style="margin: 0 0 20px 0; color: #1e293b; font-size: 24px;">¡Bienvenido/a {{tenantName}}!</h2>
                                 <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-                                    Te damos la bienvenida a KeyHomeKey, la plataforma que facilita la comunicación entre propietarios e inquilinos, 
-                                    permitiendo reportar y gestionar novedades del inmueble de manera rápida y eficiente.
+                                    Te damos la bienvenida a KeyHomeKey, tu nueva herramienta para gestionar y reportar 
+                                    novedades de tu inmueble de manera rápida y eficiente.
                                 </p>
                                 
                                 <!-- What is KeyHomeKey Section -->
@@ -195,6 +195,53 @@ interface SendEmailRequest {
 }
 
 /**
+ * Validates email format
+ */
+function isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+/**
+ * Validates the request is authorized.
+ * Authorization can be via:
+ * 1. Same-origin request (for frontend calls within the application)
+ */
+function isAuthorized(request: Request): boolean {
+    // For same-origin requests (frontend calls), check the origin/referer header
+    const origin = request.headers.get('origin');
+    const referer = request.headers.get('referer');
+    const host = request.headers.get('host');
+
+    // Allow requests where origin or referer matches the host
+    if (host) {
+        if (origin) {
+            try {
+                const originUrl = new URL(origin);
+                if (originUrl.host === host) {
+                    return true;
+                }
+            } catch {
+                // Invalid origin URL, continue to check referer
+            }
+        }
+
+        if (referer) {
+            try {
+                const refererUrl = new URL(referer);
+                if (refererUrl.host === host) {
+                    return true;
+                }
+            } catch {
+                // Invalid referer URL
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
  * Replaces variables in a template string
  * Example: "Hello {{name}}" with {name: "John"} => "Hello John"
  */
@@ -202,8 +249,10 @@ function replaceVariables(template: string, variables: Record<string, string>): 
     let result = template;
     
     for (const [key, value] of Object.entries(variables)) {
-        const regex = new RegExp(`{{${key}}}`, 'g');
-        result = result.replace(regex, value);
+        // Escape special regex characters in the key
+        const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`{{${escapedKey}}}`, 'g');
+        result = result.replace(regex, value || '');
     }
     
     return result;
@@ -211,7 +260,16 @@ function replaceVariables(template: string, variables: Record<string, string>): 
 
 export async function POST(request: Request) {
     try {
-        // 1. Validate Resend API key
+        // 1. Validate authorization (same-origin request)
+        if (!isAuthorized(request)) {
+            console.error('❌ Unauthorized request to send-email API');
+            return NextResponse.json(
+                { success: false, error: { message: 'Unauthorized' } },
+                { status: 401 }
+            );
+        }
+
+        // 2. Validate Resend API key
         const resendApiKey = process.env.RESEND_API_KEY;
         
         if (!resendApiKey) {
@@ -222,13 +280,21 @@ export async function POST(request: Request) {
             );
         }
         
-        // 2. Parse and validate request body
+        // 3. Parse and validate request body
         const body: SendEmailRequest = await request.json();
         const { to, subject, template, variables = {} } = body;
         
         if (!to || typeof to !== 'string') {
             return NextResponse.json(
                 { success: false, error: { message: 'Missing or invalid "to" field' } },
+                { status: 400 }
+            );
+        }
+
+        // Validate email format
+        if (!isValidEmail(to)) {
+            return NextResponse.json(
+                { success: false, error: { message: 'Invalid email address format' } },
                 { status: 400 }
             );
         }
@@ -247,7 +313,7 @@ export async function POST(request: Request) {
             );
         }
         
-        // 3. Get template content
+        // 4. Get template content
         const templateContent = emailTemplates[template as keyof typeof emailTemplates];
         
         if (!templateContent) {
@@ -257,10 +323,10 @@ export async function POST(request: Request) {
             );
         }
         
-        // 4. Replace variables in template
+        // 5. Replace variables in template
         const emailHtml = replaceVariables(templateContent, variables);
         
-        // 5. Initialize Resend and send email
+        // 6. Initialize Resend and send email
         const resend = new Resend(resendApiKey);
         
         const { data, error } = await resend.emails.send({
@@ -278,7 +344,7 @@ export async function POST(request: Request) {
             );
         }
         
-        // 6. Success response
+        // 7. Success response
         console.log('✅ Email sent successfully:', data?.id);
         return NextResponse.json({
             success: true,
