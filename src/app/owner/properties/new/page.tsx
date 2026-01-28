@@ -11,13 +11,6 @@ type DepartmentOption = {
   ciudades: string[];
 };
 
-type TenantUser = {
-  user_id: string;
-  name: string;
-  email: string;
-  phone: string;
-};
-
 export default function NewPropertyPage() {
   const [address, setAddress] = useState('');
   const [propertyType, setPropertyType] = useState('Apartamento');
@@ -26,70 +19,15 @@ export default function NewPropertyPage() {
   const [city, setCity] = useState('Bogotá D.C.');
   const [isRented, setIsRented] = useState(false);
   const [tenantName, setTenantName] = useState('');
-  const [tenantEmail, setTenantEmail] = useState('');
   const [tenantPhone, setTenantPhone] = useState('');
+  const [tenantEmail, setTenantEmail] = useState('');
   const [contractStart, setContractStart] = useState('');
   const [contractEnd, setContractEnd] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  // New tenant selection state
-  const [tenantSelectionMode, setTenantSelectionMode] = useState<'manual' | 'existing'>('manual');
-  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
-  const [availableTenants, setAvailableTenants] = useState<TenantUser[]>([]);
-  const [loadingTenants, setLoadingTenants] = useState(false);
 
   const router = useRouter();
 
   const departments: DepartmentOption[] = colombiaLocations;
-
-  // Load available tenant users when tenant selection mode is 'existing'
-  useEffect(() => {
-    const loadTenantUsers = async () => {
-      if (tenantSelectionMode === 'existing' && isRented) {
-        setLoadingTenants(true);
-        try {
-          // Query users_profiles for users with role TENANT
-          const { data, error } = await supabase
-            .from('users_profiles')
-            .select('user_id, name, email, phone')
-            .eq('role', 'TENANT')
-            .order('name');
-
-          if (error) {
-            console.error('Error loading tenant users:', error);
-          } else {
-            setAvailableTenants(data || []);
-          }
-        } catch (err) {
-          console.error('Unexpected error loading tenants:', err);
-        } finally {
-          setLoadingTenants(false);
-        }
-      }
-    };
-
-    loadTenantUsers();
-  }, [tenantSelectionMode, isRented]);
-
-  // Handle tenant selection from dropdown
-  const handleTenantSelection = (userId: string) => {
-    setSelectedTenantId(userId);
-    const selectedTenant = availableTenants.find(t => t.user_id === userId);
-    if (selectedTenant) {
-      // Auto-fill tenant info from selected user
-      setTenantName(selectedTenant.name);
-      setTenantEmail(selectedTenant.email);
-      setTenantPhone(selectedTenant.phone);
-    }
-  };
-
-  // Clear tenant selection when switching to manual mode
-  const handleSelectionModeChange = (mode: 'manual' | 'existing') => {
-    setTenantSelectionMode(mode);
-    if (mode === 'manual') {
-      setSelectedTenantId(null);
-    }
-  };
 
   // Actualizar ciudades cuando cambie el departamento
   useEffect(() => {
@@ -127,32 +65,7 @@ export default function NewPropertyPage() {
         return;
       }
 
-      // 2. Look up tenant_id if manual mode with email provided
-      let tenantUserId = null;
-      
-      if (isRented) {
-        if (selectedTenantId) {
-          // Existing tenant mode: use the selected tenant ID
-          tenantUserId = selectedTenantId;
-        } else if (tenantEmail) {
-          // Manual mode: try to find tenant by email in profiles (case-insensitive)
-          const { data: tenantProfile, error: tenantError } = await supabase
-            .from('users_profiles')
-            .select('user_id')
-            .ilike('email', tenantEmail.trim())
-            .single();
-          
-          if (tenantError && tenantError.code !== 'PGRST116') {
-            // PGRST116 is "no rows returned" - that's OK, just means tenant not registered
-            // Other errors should be logged
-            console.error('Error looking up tenant by email:', tenantError);
-          } else if (tenantProfile) {
-            tenantUserId = tenantProfile.user_id;
-          }
-        }
-      }
-
-      // 3. Preparar payload de la propiedad
+      // 2. Preparar payload de la propiedad
       const payload = {
         owner_id: user.id,
         address: address.trim(),
@@ -161,15 +74,13 @@ export default function NewPropertyPage() {
         department,
         city,
         is_rented: isRented,
-        tenant_id: tenantUserId,
         tenant_name: isRented ? tenantName.trim() : null,
-        tenant_email: isRented ? tenantEmail.trim() : null,
         tenant_phone: isRented ? tenantPhone.trim() : null,
         contract_start: isRented && contractStart ? contractStart : null,
         contract_end: isRented && contractEnd ? contractEnd : null,
       };
 
-      // 4. Insert en Supabase
+      // 3. Insert en Supabase
       const { error } = await supabase.from('properties').insert([payload]);
 
       if (error) {
@@ -179,60 +90,63 @@ export default function NewPropertyPage() {
         return;
       }
 
-      // 5. Send welcome email to tenant if property is rented and tenant email exists
-      if (isRented && tenantEmail && tenantEmail.trim()) {
+      // 4. Send welcome email to tenant if property is rented and email is provided
+      let emailSent = false;
+      if (isRented && tenantEmail) {
         try {
-          // Fetch owner profile to include in email
-          const { data: ownerProfile, error: profileError } = await supabase
-            .from('users_profiles')
-            .select('name, email, phone')
-            .eq('user_id', user.id)
+          // Get owner profile for full name
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
             .single();
 
           if (profileError) {
-            console.error('⚠️ Error al obtener perfil del propietario:', profileError);
+            console.error('❌ Error fetching owner profile:', profileError);
           }
 
           const emailResponse = await fetch('/api/send-email', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              email: tenantEmail.trim(),
-              name: tenantName.trim(),
-              type: 'tenant-invitation',
-              propertyData: {
-                address: address.trim(),
-                property_type: propertyType,
-                tenant_name: tenantName.trim(),
-                tenant_email: tenantEmail.trim(),
-                owner_name: ownerProfile?.name || 'Propietario',
-                owner_email: ownerProfile?.email,
-                owner_phone: ownerPhone.trim(),
-                contract_start: contractStart,
-                contract_end: contractEnd,
+              to: tenantEmail,
+              subject: '¡Bienvenido/a a KeyHomeKey! Tu nueva herramienta de gestión',
+              template: 'tenantWelcome',
+              variables: {
+                tenantName: tenantName || 'Inquilino',
+                propertyAddress: address,
+                propertyType: propertyType,
                 city: city,
                 department: department,
-              },
-            }),
+                ownerName: profile?.full_name || 'Tu propietario',
+                ownerPhone: ownerPhone,
+                contractStart: contractStart || 'No especificado',
+                contractEnd: contractEnd || 'No especificado',
+                loginUrl: `${window.location.origin}/sign-in`,
+              }
+            })
           });
 
-          const emailResult = await emailResponse.json();
-          
-          if (emailResult.success) {
-            console.log('✅ Email de bienvenida enviado al inquilino');
+          if (!emailResponse.ok) {
+            const errorText = await emailResponse.text();
+            console.error('❌ Error sending welcome email:', errorText);
+            // No bloquear el flujo si falla el email
           } else {
-            console.error('⚠️ No se pudo enviar el email al inquilino:', emailResult.error);
-            // Don't fail property creation if email fails
+            console.log('✅ Welcome email sent to tenant');
+            emailSent = true;
           }
         } catch (emailError) {
-          console.error('⚠️ Error enviando email al inquilino:', emailError);
-          // Don't fail property creation if email fails
+          console.error('❌ Failed to send welcome email:', emailError);
+          // No bloquear el flujo
         }
       }
 
-      alert('Propiedad guardada correctamente ✅');
+      // Show appropriate success message
+      if (isRented && tenantEmail && !emailSent) {
+        alert('Propiedad guardada correctamente ✅\n\nNota: No se pudo enviar el email de bienvenida al inquilino. Por favor, contacta al inquilino manualmente.');
+      } else {
+        alert('Propiedad guardada correctamente ✅');
+      }
       router.push('/owner/properties');
     } catch (err) {
       console.error('Unexpected error saving property:', err);
@@ -397,113 +311,45 @@ export default function NewPropertyPage() {
           </div>
 
           {isRented && (
-            <>
-              {/* Tenant Selection Mode */}
-              <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <label className="text-xs font-medium text-slate-700">
-                  Método de asignación de inquilino
-                </label>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectionModeChange('manual')}
-                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition ${
-                      tenantSelectionMode === 'manual'
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    Ingresar datos manualmente
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectionModeChange('existing')}
-                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition ${
-                      tenantSelectionMode === 'existing'
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    Seleccionar inquilino registrado
-                  </button>
-                </div>
-              </div>
-
-              {/* Existing Tenant Selection */}
-              {tenantSelectionMode === 'existing' && (
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700">
-                    Seleccionar inquilino registrado
-                  </label>
-                  {loadingTenants ? (
-                    <p className="text-xs text-slate-500">Cargando inquilinos...</p>
-                  ) : availableTenants.length === 0 ? (
-                    <p className="text-xs text-slate-500">
-                      No hay inquilinos registrados. Usa el modo manual para ingresar los datos.
-                    </p>
-                  ) : (
-                    <select
-                      value={selectedTenantId || ''}
-                      onChange={(e) => handleTenantSelection(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
-                    >
-                      <option value="">-- Selecciona un inquilino --</option>
-                      {availableTenants.map((tenant) => (
-                        <option key={tenant.user_id} value={tenant.user_id}>
-                          {tenant.name} ({tenant.email})
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
-
-              {/* Manual Tenant Input or Display Selected Tenant Info */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700">
-                    Nombre del inquilino
-                  </label>
-                  <input
-                    type="text"
-                    value={tenantName}
-                    onChange={(e) => setTenantName(e.target.value)}
-                    disabled={tenantSelectionMode === 'existing' && !!selectedTenantId}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700">
-                    Email del inquilino
-                  </label>
-                  <input
-                    type="email"
-                    value={tenantEmail}
-                    onChange={(e) => setTenantEmail(e.target.value)}
-                    disabled={tenantSelectionMode === 'existing' && !!selectedTenantId}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700">
-                    Teléfono del inquilino
-                  </label>
-                  <input
-                    type="tel"
-                    value={tenantPhone}
-                    onChange={(e) => setTenantPhone(e.target.value)}
-                    disabled={tenantSelectionMode === 'existing' && !!selectedTenantId}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          {isRented && (
             <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Nombre del inquilino
+                </label>
+                <input
+                  type="text"
+                  value={tenantName}
+                  onChange={(e) => setTenantName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Teléfono del inquilino
+                </label>
+                <input
+                  type="tel"
+                  value={tenantPhone}
+                  onChange={(e) => setTenantPhone(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Email del inquilino *
+                </label>
+                <input
+                  type="email"
+                  value={tenantEmail}
+                  onChange={(e) => setTenantEmail(e.target.value)}
+                  required={isRented}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                  placeholder="inquilino@ejemplo.com"
+                />
+              </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-700">
                   Fecha de inicio del contrato
