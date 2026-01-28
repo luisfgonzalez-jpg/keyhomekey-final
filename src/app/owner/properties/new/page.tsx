@@ -20,6 +20,7 @@ export default function NewPropertyPage() {
   const [isRented, setIsRented] = useState(false);
   const [tenantName, setTenantName] = useState('');
   const [tenantPhone, setTenantPhone] = useState('');
+  const [tenantEmail, setTenantEmail] = useState('');
   const [contractStart, setContractStart] = useState('');
   const [contractEnd, setContractEnd] = useState('');
   const [loading, setLoading] = useState(false);
@@ -89,7 +90,63 @@ export default function NewPropertyPage() {
         return;
       }
 
-      alert('Propiedad guardada correctamente ✅');
+      // 4. Send welcome email to tenant if property is rented and email is provided
+      let emailSent = false;
+      if (isRented && tenantEmail) {
+        try {
+          // Get owner profile for full name
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .single();
+
+          if (profileError) {
+            console.error('❌ Error fetching owner profile:', profileError);
+          }
+
+          const emailResponse = await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: tenantEmail,
+              subject: '¡Bienvenido/a a KeyHomeKey! Tu nueva herramienta de gestión',
+              template: 'tenantWelcome',
+              variables: {
+                tenantName: tenantName || 'Inquilino',
+                propertyAddress: address,
+                propertyType: propertyType,
+                city: city,
+                department: department,
+                ownerName: profile?.full_name || 'Tu propietario',
+                ownerPhone: ownerPhone,
+                contractStart: contractStart || 'No especificado',
+                contractEnd: contractEnd || 'No especificado',
+                loginUrl: `${window.location.origin}/sign-in`,
+              }
+            })
+          });
+
+          if (!emailResponse.ok) {
+            const errorText = await emailResponse.text();
+            console.error('❌ Error sending welcome email:', errorText);
+            // No bloquear el flujo si falla el email
+          } else {
+            console.log('✅ Welcome email sent to tenant');
+            emailSent = true;
+          }
+        } catch (emailError) {
+          console.error('❌ Failed to send welcome email:', emailError);
+          // No bloquear el flujo
+        }
+      }
+
+      // Show appropriate success message
+      if (isRented && tenantEmail && !emailSent) {
+        alert('Propiedad guardada correctamente ✅\n\nNota: No se pudo enviar el email de bienvenida al inquilino. Por favor, contacta al inquilino manualmente.');
+      } else {
+        alert('Propiedad guardada correctamente ✅');
+      }
       router.push('/owner/properties');
     } catch (err) {
       console.error('Unexpected error saving property:', err);
@@ -276,6 +333,20 @@ export default function NewPropertyPage() {
                   value={tenantPhone}
                   onChange={(e) => setTenantPhone(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Email del inquilino *
+                </label>
+                <input
+                  type="email"
+                  value={tenantEmail}
+                  onChange={(e) => setTenantEmail(e.target.value)}
+                  required={isRented}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                  placeholder="inquilino@ejemplo.com"
                 />
               </div>
 
