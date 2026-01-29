@@ -291,16 +291,59 @@ export async function POST(request: Request) {
         }
         
         // 3. Parse and validate request body
-        const body: SendEmailRequest = await request.json();
-        const { to, subject, template, variables = {} } = body;
-        
-        // Log email configuration for debugging (only in development)
+        const body: any = await request.json();
+
+        // BACKWARD COMPATIBILITY: Handle legacy format
+        // Legacy format: { email: "...", propertyAddress: "..." }
+        // New format: { to: "...", subject: "...", template: "...", variables: {...} }
+
+        let to: string;
+        let subject: string;
+        let template: string;
+        let variables: Record<string, string> = {};
+
+        // Check if this is legacy format (has 'email' field instead of 'to')
+        if (body.email && !body.to) {
+            console.warn('⚠️  Legacy email format detected, auto-converting...');
+            
+            // Convert legacy format to new format
+            to = body.email;
+            subject = '¡Bienvenido/a a KeyHomeKey! Tu nueva herramienta de gestión';
+            template = 'tenantWelcome';
+            
+            // Build variables from legacy format
+            variables = {
+                tenantName: body.tenantName || 'Inquilino',
+                propertyAddress: body.propertyAddress || 'Dirección no especificada',
+                propertyType: body.propertyType || 'Inmueble',
+                city: body.city || 'Ciudad',
+                department: body.department || 'Departamento',
+                ownerName: body.ownerName || 'Propietario',
+                ownerPhone: body.ownerPhone || 'Teléfono no disponible',
+                contractStart: body.contractStart || 'No especificado',
+                contractEnd: body.contractEnd || 'No especificado',
+                loginUrl: body.loginUrl || 'https://keyhomekey.com/sign-in',
+            };
+            
+            console.log('✅ Legacy format converted to new format');
+        } else {
+            // Use new format
+            to = body.to;
+            subject = body.subject;
+            template = body.template;
+            variables = body.variables || {};
+        }
+
+        // Log email configuration for debugging
         if (process.env.NODE_ENV === 'development') {
             console.log('📧 Email will be sent from:', fromEmail);
             console.log('📧 Email will be sent to:', to);
+            console.log('📧 Template:', template);
         }
-        
+
+        // Validate required fields
         if (!to || typeof to !== 'string') {
+            console.error('❌ Missing "to" field. Body received:', body);
             return NextResponse.json(
                 { success: false, error: { message: 'Missing or invalid "to" field' } },
                 { status: 400 }
