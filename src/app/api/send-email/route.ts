@@ -194,6 +194,21 @@ interface SendEmailRequest {
     variables?: Record<string, string>;
 }
 
+// Legacy format interface for backward compatibility
+interface LegacyEmailRequest {
+    email: string;
+    propertyAddress?: string;
+    tenantName?: string;
+    propertyType?: string;
+    city?: string;
+    department?: string;
+    ownerName?: string;
+    ownerPhone?: string;
+    contractStart?: string;
+    contractEnd?: string;
+    loginUrl?: string;
+}
+
 /**
  * Validates email format
  */
@@ -291,7 +306,7 @@ export async function POST(request: Request) {
         }
         
         // 3. Parse and validate request body
-        const body: any = await request.json();
+        const body: SendEmailRequest | LegacyEmailRequest = await request.json();
 
         // BACKWARD COMPATIBILITY: Handle legacy format
         // Legacy format: { email: "...", propertyAddress: "..." }
@@ -303,11 +318,26 @@ export async function POST(request: Request) {
         let variables: Record<string, string> = {};
 
         // Check if this is legacy format (has 'email' field instead of 'to')
-        if (body.email && !body.to) {
+        if ('email' in body && !('to' in body)) {
+            // Warn if request contains fields from both formats
+            if ('subject' in body || 'template' in body || 'variables' in body) {
+                console.warn('⚠️  Request contains both legacy and new format fields. Using legacy format conversion.');
+            }
+            
             console.warn('⚠️  Legacy email format detected, auto-converting...');
+            
+            // Validate email before conversion
+            if (!body.email || typeof body.email !== 'string') {
+                console.error('❌ Missing or invalid "email" field in legacy format. Body received:', body);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Missing or invalid "email" field' } },
+                    { status: 400 }
+                );
+            }
             
             // Convert legacy format to new format
             to = body.email;
+            // Note: Legacy format always uses tenantWelcome template and Spanish defaults
             subject = '¡Bienvenido/a a KeyHomeKey! Tu nueva herramienta de gestión';
             template = 'tenantWelcome';
             
@@ -325,13 +355,30 @@ export async function POST(request: Request) {
                 loginUrl: body.loginUrl || 'https://keyhomekey.com/sign-in',
             };
             
-            console.log('✅ Legacy format converted to new format');
+            console.log('✅ Legacy format converted to new format (tenantWelcome template with Spanish defaults)');
         } else {
             // Use new format
-            to = body.to;
-            subject = body.subject;
-            template = body.template;
-            variables = body.variables || {};
+            to = (body as SendEmailRequest).to;
+            subject = (body as SendEmailRequest).subject;
+            template = (body as SendEmailRequest).template;
+            variables = (body as SendEmailRequest).variables || {};
+            
+            // Validate required fields for new format
+            if (!subject || typeof subject !== 'string') {
+                console.error('❌ Missing or invalid "subject" field in new format. Body received:', body);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Missing or invalid "subject" field' } },
+                    { status: 400 }
+                );
+            }
+            
+            if (!template || typeof template !== 'string') {
+                console.error('❌ Missing or invalid "template" field in new format. Body received:', body);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Missing or invalid "template" field' } },
+                    { status: 400 }
+                );
+            }
         }
 
         // Log email configuration for debugging
@@ -341,7 +388,7 @@ export async function POST(request: Request) {
             console.log('📧 Template:', template);
         }
 
-        // Validate required fields
+        // Validate required fields (common to both formats)
         if (!to || typeof to !== 'string') {
             console.error('❌ Missing "to" field. Body received:', body);
             return NextResponse.json(
