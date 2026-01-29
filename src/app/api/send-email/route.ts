@@ -281,17 +281,22 @@ export async function POST(request: Request) {
         }
 
         // NEW: Validate sender email configuration
-        const fromEmail = process.env.RESEND_FROM_EMAIL || 'delivered@resend.dev';
+        const fromEmail = process.env.RESEND_FROM_EMAIL || 'KeyHomeKey <noreply@keyhomekey.com>';
 
-        // Log warning only in development mode to avoid log pollution
-        if (!process.env.RESEND_FROM_EMAIL && process.env.NODE_ENV === 'development') {
-            console.warn('⚠️  RESEND_FROM_EMAIL not configured, using Resend development email (delivered@resend.dev)');
-            console.warn('⚠️  For production, configure a verified domain at https://resend.com/domains');
+        // Log sender configuration
+        if (!process.env.RESEND_FROM_EMAIL) {
+            console.warn('⚠️  RESEND_FROM_EMAIL not set, using default: noreply@keyhomekey.com');
+        } else {
+            console.log('✅ Using configured sender:', process.env.RESEND_FROM_EMAIL);
         }
         
         // 3. Parse and validate request body
         const body: SendEmailRequest = await request.json();
         const { to, subject, template, variables = {} } = body;
+        
+        // Log email configuration for debugging
+        console.log('📧 Email will be sent from:', fromEmail);
+        console.log('📧 Email will be sent to:', to);
         
         if (!to || typeof to !== 'string') {
             return NextResponse.json(

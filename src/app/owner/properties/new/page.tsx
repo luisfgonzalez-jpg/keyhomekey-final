@@ -94,6 +94,19 @@ export default function NewPropertyPage() {
       let emailSent = false;
       if (isRented && tenantEmail) {
         try {
+          // Add debugging and validation
+          console.log('📧 Sending email to tenant:', tenantEmail);
+          console.log('📧 Tenant name:', tenantName);
+          console.log('📧 Property:', address);
+
+          // Validate email before sending
+          if (!tenantEmail || !tenantEmail.includes('@')) {
+            console.error('❌ Invalid tenant email:', tenantEmail);
+            alert('Error: Email del inquilino inválido');
+            setLoading(false);
+            return;
+          }
+
           // Get owner profile for full name
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -109,7 +122,7 @@ export default function NewPropertyPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              to: tenantEmail,
+              to: tenantEmail.trim(),
               subject: '¡Bienvenido/a a KeyHomeKey! Tu nueva herramienta de gestión',
               template: 'tenantWelcome',
               variables: {
@@ -127,12 +140,18 @@ export default function NewPropertyPage() {
             })
           });
 
+          // Add enhanced error logging
           if (!emailResponse.ok) {
             const errorText = await emailResponse.text();
             console.error('❌ Error sending welcome email:', errorText);
-            // No bloquear el flujo si falla el email
+            console.error('📧 Attempted to:', tenantEmail);
+            console.error('📧 From page:', window.location.href);
+            // Don't block flow if email fails
           } else {
-            console.log('✅ Welcome email sent to tenant');
+            const result = await emailResponse.json();
+            console.log('✅ Welcome email sent successfully');
+            console.log('📧 Email ID:', result.data?.emailId);
+            console.log('📧 Sent to:', result.data?.to);
             emailSent = true;
           }
         } catch (emailError) {
