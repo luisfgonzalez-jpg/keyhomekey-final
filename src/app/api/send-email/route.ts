@@ -194,6 +194,21 @@ interface SendEmailRequest {
     variables?: Record<string, string>;
 }
 
+// Legacy format interface for backward compatibility
+interface LegacyEmailRequest {
+    email: string;
+    propertyAddress?: string;
+    tenantName?: string;
+    propertyType?: string;
+    city?: string;
+    department?: string;
+    ownerName?: string;
+    ownerPhone?: string;
+    contractStart?: string;
+    contractEnd?: string;
+    loginUrl?: string;
+}
+
 /**
  * Validates email format
  */
@@ -291,42 +306,124 @@ export async function POST(request: Request) {
         }
         
         // 3. Parse and validate request body
-        const body: SendEmailRequest = await request.json();
-        const { to, subject, template, variables = {} } = body;
-        
-        // Log email configuration for debugging (only in development)
-        if (process.env.NODE_ENV === 'development') {
-            console.log('📧 Email will be sent from:', fromEmail);
-            console.log('📧 Email will be sent to:', to);
-        }
-        
-        if (!to || typeof to !== 'string') {
+        const body: SendEmailRequest | LegacyEmailRequest = await request.json();
+
+        // BACKWARD COMPATIBILITY: Handle legacy format
+        // Legacy format: { email: "...", propertyAddress: "..." }
+        // New format: { to: "...", subject: "...", template: "...", variables: {...} }
+
+        let to: string;
+        let subject: string;
+        let template: string;
+        let variables: Record<string, string> = {};
+
+        // Check if this is legacy format (has 'email' field instead of 'to')
+        if ('email' in body && !('to' in body)) {
+            // Warn if request contains fields from both formats
+            if ('subject' in body || 'template' in body || 'variables' in body) {
+                console.warn('⚠️  Request contains both legacy and new format fields. Using legacy format conversion.');
+            }
+            
+            console.warn('⚠️  Legacy email format detected, auto-converting...');
+            
+            // Validate email before conversion
+            if (!body.email || typeof body.email !== 'string') {
+                console.error('❌ Missing or invalid "email" field in legacy format. Body received:', body);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Missing or invalid "email" field' } },
+                    { status: 400 }
+                );
+            }
+            
+            // Validate email format early for legacy format
+            if (!isValidEmail(body.email)) {
+                console.error('❌ Invalid email format in legacy format:', body.email);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Invalid email address format' } },
+                    { status: 400 }
+                );
+            }
+            
+            // Convert legacy format to new format
+            to = body.email;
+            // Note: Legacy format always uses tenantWelcome template and Spanish defaults
+            subject = '¡Bienvenido/a a KeyHomeKey! Tu nueva herramienta de gestión';
+            template = 'tenantWelcome';
+            
+            // Build variables from legacy format
+            variables = {
+                tenantName: body.tenantName || 'Inquilino',
+                propertyAddress: body.propertyAddress || 'Dirección no especificada',
+                propertyType: body.propertyType || 'Inmueble',
+                city: body.city || 'Ciudad',
+                department: body.department || 'Departamento',
+                ownerName: body.ownerName || 'Propietario',
+                ownerPhone: body.ownerPhone || 'Teléfono no disponible',
+                contractStart: body.contractStart || 'No especificado',
+                contractEnd: body.contractEnd || 'No especificado',
+                loginUrl: body.loginUrl || 'https://keyhomekey.com/sign-in',
+            };
+            
+            console.log('✅ Legacy format converted to new format (tenantWelcome template with Spanish defaults)');
+        } else if ('to' in body) {
+            // Use new format
+            // Check for ambiguous request (contains both email and to)
+            if ('email' in body) {
+                console.warn('⚠️  Request contains both "email" and "to" fields. Using "to" field (new format).');
+            }
+            
+            to = (body as SendEmailRequest).to;
+            subject = (body as SendEmailRequest).subject;
+            template = (body as SendEmailRequest).template;
+            variables = (body as SendEmailRequest).variables || {};
+            
+            // Validate required fields for new format
+            if (!to || typeof to !== 'string') {
+                console.error('❌ Missing or invalid "to" field in new format. Body received:', body);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Missing or invalid "to" field' } },
+                    { status: 400 }
+                );
+            }
+            
+            // Validate email format early for new format
+            if (!isValidEmail(to)) {
+                console.error('❌ Invalid email format in new format:', to);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Invalid email address format' } },
+                    { status: 400 }
+                );
+            }
+            
+            if (!subject || typeof subject !== 'string') {
+                console.error('❌ Missing or invalid "subject" field in new format. Body received:', body);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Missing or invalid "subject" field' } },
+                    { status: 400 }
+                );
+            }
+            
+            if (!template || typeof template !== 'string') {
+                console.error('❌ Missing or invalid "template" field in new format. Body received:', body);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Missing or invalid "template" field' } },
+                    { status: 400 }
+                );
+            }
+        } else {
+            // Malformed request - missing both email and to fields
+            console.error('❌ Malformed request: missing both "email" and "to" fields. Body received:', body);
             return NextResponse.json(
-                { success: false, error: { message: 'Missing or invalid "to" field' } },
+                { success: false, error: { message: 'Invalid request format: missing "to" or "email" field' } },
                 { status: 400 }
             );
         }
 
-        // Validate email format
-        if (!isValidEmail(to)) {
-            return NextResponse.json(
-                { success: false, error: { message: 'Invalid email address format' } },
-                { status: 400 }
-            );
-        }
-        
-        if (!subject || typeof subject !== 'string') {
-            return NextResponse.json(
-                { success: false, error: { message: 'Missing or invalid "subject" field' } },
-                { status: 400 }
-            );
-        }
-        
-        if (!template || typeof template !== 'string') {
-            return NextResponse.json(
-                { success: false, error: { message: 'Missing or invalid "template" field' } },
-                { status: 400 }
-            );
+        // Log email configuration for debugging
+        if (process.env.NODE_ENV === 'development') {
+            console.log('📧 Email will be sent from:', fromEmail);
+            console.log('📧 Email will be sent to:', to);
+            console.log('📧 Template:', template);
         }
         
         // 4. Get template content
