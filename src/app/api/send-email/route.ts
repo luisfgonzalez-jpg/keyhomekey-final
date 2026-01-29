@@ -335,6 +335,15 @@ export async function POST(request: Request) {
                 );
             }
             
+            // Validate email format early for legacy format
+            if (!isValidEmail(body.email)) {
+                console.error('❌ Invalid email format in legacy format:', body.email);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Invalid email address format' } },
+                    { status: 400 }
+                );
+            }
+            
             // Convert legacy format to new format
             to = body.email;
             // Note: Legacy format always uses tenantWelcome template and Spanish defaults
@@ -356,14 +365,36 @@ export async function POST(request: Request) {
             };
             
             console.log('✅ Legacy format converted to new format (tenantWelcome template with Spanish defaults)');
-        } else {
+        } else if ('to' in body) {
             // Use new format
+            // Check for ambiguous request (contains both email and to)
+            if ('email' in body) {
+                console.warn('⚠️  Request contains both "email" and "to" fields. Using "to" field (new format).');
+            }
+            
             to = (body as SendEmailRequest).to;
             subject = (body as SendEmailRequest).subject;
             template = (body as SendEmailRequest).template;
             variables = (body as SendEmailRequest).variables || {};
             
             // Validate required fields for new format
+            if (!to || typeof to !== 'string') {
+                console.error('❌ Missing or invalid "to" field in new format. Body received:', body);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Missing or invalid "to" field' } },
+                    { status: 400 }
+                );
+            }
+            
+            // Validate email format early for new format
+            if (!isValidEmail(to)) {
+                console.error('❌ Invalid email format in new format:', to);
+                return NextResponse.json(
+                    { success: false, error: { message: 'Invalid email address format' } },
+                    { status: 400 }
+                );
+            }
+            
             if (!subject || typeof subject !== 'string') {
                 console.error('❌ Missing or invalid "subject" field in new format. Body received:', body);
                 return NextResponse.json(
@@ -379,6 +410,13 @@ export async function POST(request: Request) {
                     { status: 400 }
                 );
             }
+        } else {
+            // Malformed request - missing both email and to fields
+            console.error('❌ Malformed request: missing both "email" and "to" fields. Body received:', body);
+            return NextResponse.json(
+                { success: false, error: { message: 'Invalid request format: missing "to" or "email" field' } },
+                { status: 400 }
+            );
         }
 
         // Log email configuration for debugging
@@ -386,37 +424,6 @@ export async function POST(request: Request) {
             console.log('📧 Email will be sent from:', fromEmail);
             console.log('📧 Email will be sent to:', to);
             console.log('📧 Template:', template);
-        }
-
-        // Validate required fields (common to both formats)
-        if (!to || typeof to !== 'string') {
-            console.error('❌ Missing "to" field. Body received:', body);
-            return NextResponse.json(
-                { success: false, error: { message: 'Missing or invalid "to" field' } },
-                { status: 400 }
-            );
-        }
-
-        // Validate email format
-        if (!isValidEmail(to)) {
-            return NextResponse.json(
-                { success: false, error: { message: 'Invalid email address format' } },
-                { status: 400 }
-            );
-        }
-        
-        if (!subject || typeof subject !== 'string') {
-            return NextResponse.json(
-                { success: false, error: { message: 'Missing or invalid "subject" field' } },
-                { status: 400 }
-            );
-        }
-        
-        if (!template || typeof template !== 'string') {
-            return NextResponse.json(
-                { success: false, error: { message: 'Missing or invalid "template" field' } },
-                { status: 400 }
-            );
         }
         
         // 4. Get template content
