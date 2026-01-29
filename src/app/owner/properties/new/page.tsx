@@ -65,7 +65,21 @@ export default function NewPropertyPage() {
         return;
       }
 
-      // 2. Preparar payload de la propiedad
+      // 2. Validate tenant email before proceeding (if property is rented and email is provided)
+      if (isRented && tenantEmail) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(tenantEmail.trim())) {
+          console.error('❌ Invalid tenant email format:', tenantEmail);
+          alert('Error: El formato del email del inquilino es inválido');
+          setLoading(false);
+          return;
+        }
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ Tenant email validated:', tenantEmail.trim());
+        }
+      }
+
+      // 3. Preparar payload de la propiedad
       const payload = {
         owner_id: user.id,
         address: address.trim(),
@@ -80,7 +94,7 @@ export default function NewPropertyPage() {
         contract_end: isRented && contractEnd ? contractEnd : null,
       };
 
-      // 3. Insert en Supabase
+      // 4. Insert en Supabase
       const { error } = await supabase.from('properties').insert([payload]);
 
       if (error) {
@@ -90,21 +104,13 @@ export default function NewPropertyPage() {
         return;
       }
 
-      // 4. Send welcome email to tenant if property is rented and email is provided
+      // 5. Send welcome email to tenant if property is rented and email is provided
       let emailSent = false;
       if (isRented && tenantEmail) {
         try {
-          // Add debugging and validation
-          console.log('📧 Sending email to tenant:', tenantEmail);
-          console.log('📧 Tenant name:', tenantName);
-          console.log('📧 Property:', address);
-
-          // Validate email before sending
-          if (!tenantEmail || !tenantEmail.includes('@')) {
-            console.error('❌ Invalid tenant email:', tenantEmail);
-            alert('Error: Email del inquilino inválido');
-            setLoading(false);
-            return;
+          // Debug logging (only in development)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('📧 Sending welcome email to tenant');
           }
 
           // Get owner profile for full name
@@ -140,18 +146,16 @@ export default function NewPropertyPage() {
             })
           });
 
-          // Add enhanced error logging
           if (!emailResponse.ok) {
             const errorText = await emailResponse.text();
             console.error('❌ Error sending welcome email:', errorText);
-            console.error('📧 Attempted to:', tenantEmail);
-            console.error('📧 From page:', window.location.href);
             // Don't block flow if email fails
           } else {
-            const result = await emailResponse.json();
-            console.log('✅ Welcome email sent successfully');
-            console.log('📧 Email ID:', result.data?.emailId);
-            console.log('📧 Sent to:', result.data?.to);
+            if (process.env.NODE_ENV === 'development') {
+              const result = await emailResponse.json();
+              console.log('✅ Welcome email sent successfully');
+              console.log('📧 Email ID:', result.data?.emailId);
+            }
             emailSent = true;
           }
         } catch (emailError) {
