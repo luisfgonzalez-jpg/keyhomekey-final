@@ -1,7 +1,7 @@
 // src/app/owner/properties/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -119,34 +119,38 @@ export default function OwnerPropertiesPage() {
   };
 
   // Filter properties
-  const filteredProperties = properties.filter(property => {
-    // Filter by city
-    if (filterCity !== 'all' && property.city !== filterCity) {
-      return false;
-    }
-    
-    // Filter by address (search)
-    if (filterSearch && !property.address.toLowerCase().includes(filterSearch.toLowerCase())) {
-      return false;
-    }
-    
-    // Filter by property type
-    if (filterType !== 'all' && property.property_type !== filterType) {
-      return false;
-    }
-    
-    // Filter by rental status
-    if (filterRented !== 'all') {
-      const isRented = property.is_rented;
-      if (filterRented === 'rented' && !isRented) return false;
-      if (filterRented === 'available' && isRented) return false;
-    }
-    
-    return true;
-  });
+  const filteredProperties = useMemo(() => {
+    return properties.filter(property => {
+      // Filter by city
+      if (filterCity !== 'all' && property.city !== filterCity) {
+        return false;
+      }
+      
+      // Filter by address (search)
+      if (filterSearch && !property.address?.toLowerCase().includes(filterSearch.toLowerCase())) {
+        return false;
+      }
+      
+      // Filter by property type
+      if (filterType !== 'all' && property.property_type !== filterType) {
+        return false;
+      }
+      
+      // Filter by rental status
+      if (filterRented !== 'all') {
+        const isRented = property.is_rented;
+        if (filterRented === 'rented' && !isRented) return false;
+        if (filterRented === 'available' && isRented) return false;
+      }
+      
+      return true;
+    });
+  }, [properties, filterCity, filterSearch, filterType, filterRented]);
 
   // Get unique cities for filter dropdown
-  const uniqueCities = Array.from(new Set(properties.map(p => p.city).filter(c => c !== null))).sort();
+  const uniqueCities = useMemo(() => {
+    return Array.from(new Set(properties.map(p => p.city).filter(c => c !== null))).sort();
+  }, [properties]);
 
   // Get unique property types for filter dropdown
   const propertyTypes = ['Apartamento', 'Casa', 'Oficina', 'Local', 'Bodega', 'Otro'];
@@ -278,6 +282,7 @@ export default function OwnerPropertiesPage() {
                     disabled={isDeleting}
                     className="absolute top-3 right-3 p-2 rounded-full bg-white/80 hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Eliminar propiedad"
+                    aria-label="Eliminar propiedad"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />

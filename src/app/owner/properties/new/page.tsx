@@ -94,13 +94,19 @@ export default function NewPropertyPage() {
         setOwnerPhoneError(validation.error);
       } else {
         setOwnerPhoneError('');
-        // Auto-format on blur
-        if (validation.valid) {
-          setOwnerPhone(validation.formatted);
-        }
       }
     } else {
       setOwnerPhoneError('');
+    }
+  };
+
+  // Owner phone blur handler for auto-formatting
+  const handleOwnerPhoneBlur = () => {
+    if (ownerPhone && ownerPhone.length >= 7) {
+      const validation = validateColombianPhone(ownerPhone);
+      if (validation.valid) {
+        setOwnerPhone(validation.formatted);
+      }
     }
   };
 
@@ -114,12 +120,19 @@ export default function NewPropertyPage() {
         setTenantPhoneError(validation.error);
       } else {
         setTenantPhoneError('');
-        if (validation.valid) {
-          setTenantPhone(validation.formatted);
-        }
       }
     } else {
       setTenantPhoneError('');
+    }
+  };
+
+  // Tenant phone blur handler for auto-formatting
+  const handleTenantPhoneBlur = () => {
+    if (tenantPhone && tenantPhone.length >= 7) {
+      const validation = validateColombianPhone(tenantPhone);
+      if (validation.valid) {
+        setTenantPhone(validation.formatted);
+      }
     }
   };
 
@@ -145,6 +158,7 @@ export default function NewPropertyPage() {
     // Check if start date is not too far in the past (more than 10 years)
     const tenYearsAgo = new Date();
     tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
+    tenYearsAgo.setHours(0, 0, 0, 0); // Reset time for comparison
     
     if (startDate < tenYearsAgo) {
       return {
@@ -156,6 +170,7 @@ export default function NewPropertyPage() {
     // Check if end date is not too far in future (more than 10 years)
     const tenYearsFromNow = new Date();
     tenYearsFromNow.setFullYear(tenYearsFromNow.getFullYear() + 10);
+    tenYearsFromNow.setHours(0, 0, 0, 0); // Reset time for comparison
     
     if (endDate > tenYearsFromNow) {
       return {
@@ -167,6 +182,7 @@ export default function NewPropertyPage() {
     // Warn if contract is ending soon (within 30 days)
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    thirtyDaysFromNow.setHours(0, 0, 0, 0); // Reset time for comparison
     
     if (endDate <= thirtyDaysFromNow && endDate >= today) {
       // This is a warning, not an error
@@ -429,6 +445,7 @@ export default function NewPropertyPage() {
                 type="tel"
                 value={ownerPhone}
                 onChange={(e) => handleOwnerPhoneChange(e.target.value)}
+                onBlur={handleOwnerPhoneBlur}
                 required
                 className={`w-full rounded-lg border ${ownerPhoneError ? 'border-red-300' : 'border-slate-200'} px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200`}
                 placeholder="3XX XXX XXXX"
@@ -541,6 +558,7 @@ export default function NewPropertyPage() {
                   type="tel"
                   value={tenantPhone}
                   onChange={(e) => handleTenantPhoneChange(e.target.value)}
+                  onBlur={handleTenantPhoneBlur}
                   className={`w-full rounded-lg border ${tenantPhoneError ? 'border-red-300' : 'border-slate-200'} px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200`}
                   placeholder="3XX XXX XXXX"
                 />
@@ -572,7 +590,7 @@ export default function NewPropertyPage() {
                   value={contractStart}
                   onChange={(e) => handleDateChange('start', e.target.value)}
                   max={contractEnd || undefined} // Can't be after end date
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                  className={`w-full rounded-lg border ${dateError && !dateError.includes('⚠️') ? 'border-red-300' : 'border-slate-200'} px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200`}
                 />
               </div>
 
@@ -585,7 +603,7 @@ export default function NewPropertyPage() {
                   value={contractEnd}
                   onChange={(e) => handleDateChange('end', e.target.value)}
                   min={contractStart || undefined} // Can't be before start date
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                  className={`w-full rounded-lg border ${dateError && !dateError.includes('⚠️') ? 'border-red-300' : 'border-slate-200'} px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200`}
                 />
               </div>
 
