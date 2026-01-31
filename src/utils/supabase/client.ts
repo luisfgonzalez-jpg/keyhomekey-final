@@ -1,12 +1,17 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
-// 1. Asegúrate de tener estas variables en tu archivo .env.local
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Faltan las variables de entorno de Supabase (URL o Key)')
+/**
+ * Creates a Supabase browser client for client-side operations.
+ * 
+ * When used with Next.js middleware, this client automatically uses
+ * HTTP cookies for session storage instead of localStorage.
+ * 
+ * @returns Configured Supabase browser client
+ * @version 3.0.0 - SSR with middleware (PR #30)
+ */
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }
-
-// 2. Creamos y exportamos el cliente de Supabase
-export const createClient = () => createSupabaseClient(supabaseUrl, supabaseAnonKey)

@@ -1,0 +1,242 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
+
+// Environment variables
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+// Constants for user defaults
+const DEFAULT_USER_NAME = 'Usuario';
+const DEFAULT_USER_ROLE = 'TENANT' as const;
+
+// Type definitions
+interface AuthenticatedUser {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+  app_metadata?: Record<string, unknown>;
+}
+
+interface AuthSuccess {
+  supabase: SupabaseClient;
+  user: AuthenticatedUser;
+  error?: undefined;
+}
+
+interface AuthError {
+  error: NextResponse;
+  supabase?: undefined;
+  user?: undefined;
+}
+
+/**
+ * Extracts user display name from JWT user object
+ * Falls back to email username if metadata not available
+ */
+function getUserDisplayName(user: AuthenticatedUser): string {
+  const metadata = user.user_metadata || {};
+  return (metadata.full_name as string) || 
+         (metadata.name as string) || 
+         user.email?.split('@')[0] || 
+         DEFAULT_USER_NAME;
+}
+
+/**
+ * Extracts user role from JWT user object
+ * Falls back to TENANT if metadata not available
+ */
+function getUserRole(user: AuthenticatedUser): string {
+  const userMeta = user.user_metadata || {};
+  const appMeta = user.app_metadata || {};
+  return (userMeta.role as string) || 
+         (appMeta.role as string) || 
+         DEFAULT_USER_ROLE;
+}
+
+/**
+ * Creates an authenticated Supabase client using the Bearer token from request headers
+ * Returns the client and authenticated user, or an error response if authentication fails
+ */
+async function createAuthenticatedClient(request: NextRequest): Promise<AuthSuccess | AuthError> {
+  // Read token from Authorization header
+  const authHeader = request.headers.get('authorization');
+  const token = authHeader?.replace(/^Bearer\s+/i, '');
+
+  if (!token) {
+    return { error: NextResponse.json({ error: 'No authorization token provided' }, { status: 401 }) };
+  }
+
+  // Create Supabase client with the user's JWT token for RLS enforcement
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } }
+  });
+  
+  // Validate token with Supabase
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  
+  if (authError || !user) {
+    console.error('Auth error:', authError);
+    return { error: NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 }) };
+  }
+
+  return { supabase, user };
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: ticketId } = await params;
+
+    // Create authenticated Supabase client
+    const authResult = await createAuthenticatedClient(request);
+    if (authResult.error) {
+      return authResult.error;
+    }
+    const { supabase } = authResult;
+
+    // Obtener comentarios con verificación de acceso (RLS se encarga)
+    const { data: comments, error } = await supabase
+      .from('ticket_comments')
+      .select('*')
+      .eq('ticket_id', ticketId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching comments:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, comments });
+  } catch (error: unknown) {
+    console.error('Error in GET /api/tickets/[id]/comments:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: ticketId } = await params;
+    const body = await request.json();
+    const { comment_text, media_urls = [], comment_type = 'comment' } = body;
+
+    // Create authenticated Supabase client
+    const authResult = await createAuthenticatedClient(request);
+    if (authResult.error) {
+      return authResult.error;
+    }
+    const { supabase, user } = authResult;
+
+    // Get user info from JWT/session (no database query to avoid permission errors)
+    const userName = getUserDisplayName(user);
+    const userRole = getUserRole(user);
+
+    // Crear comentario
+    const { data: newComment, error: insertError } = await supabase
+      .from('ticket_comments')
+      .insert([{
+        ticket_id: ticketId,
+        user_id: user.id,
+        user_name: userName,
+        user_role: userRole,
+        comment_text,
+        comment_type,
+        media_urls,
+      }])
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error creating comment:', insertError);
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+
+    // Obtener información del ticket y notificar a otros usuarios
+    const { data: ticket } = await supabase
+      .from('tickets')
+      .select(`
+        *,
+        properties (
+          owner_id,
+          tenant_email,
+          tenant_phone,
+          address
+        ),
+        providers (
+          phone,
+          name
+        )
+      `)
+      .eq('id', ticketId)
+      .single();
+
+    if (ticket) {
+      // Función para crear el mensaje de notificación
+      const createNotificationMessage = (role: string) => {
+        return `💬 Nuevo comentario en ticket #${ticketId.substring(0, 8)}\nDe: ${userName} (${role})\n"${comment_text}"\n\nVer ticket: ${process.env.NEXT_PUBLIC_SITE_URL || ''}/tickets/${ticketId}`;
+      };
+
+      // Base URL para las notificaciones
+      const notifyApiUrl = `${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/whatsapp/notify`;
+      const apiHeaders = {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.INTERNAL_API_KEY || ''
+      };
+
+      // Enviar notificaciones WhatsApp (solo a quienes NO escribieron el comentario)
+      const notifications = [];
+      
+      // Notificar al proveedor si existe y no es quien comentó
+      if (ticket.assigned_provider_id && userRole !== 'PROVIDER' && ticket.providers?.phone) {
+        notifications.push(
+          fetch(notifyApiUrl, {
+            method: 'POST',
+            headers: apiHeaders,
+            body: JSON.stringify({
+              to: ticket.providers.phone,
+              message: createNotificationMessage(userRole)
+            })
+          })
+        );
+      }
+
+      // Notificar al inquilino si no es quien comentó
+      if (userRole !== 'TENANT' && ticket.properties?.tenant_phone) {
+        notifications.push(
+          fetch(notifyApiUrl, {
+            method: 'POST',
+            headers: apiHeaders,
+            body: JSON.stringify({
+              to: ticket.properties.tenant_phone,
+              message: createNotificationMessage(userRole)
+            })
+          })
+        );
+      }
+
+      // Ejecutar notificaciones en paralelo sin bloquear respuesta
+      Promise.all(notifications).catch(err => console.error('Error sending notifications:', err));
+    }
+
+    // Attach user info from JWT token (not from database) to avoid permission errors
+    const commentWithUser = {
+      ...newComment,
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: getUserDisplayName(user)
+      }
+    };
+
+    return NextResponse.json({ success: true, comment: commentWithUser });
+  } catch (error: unknown) {
+    console.error('Error in POST /api/tickets/[id]/comments:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}

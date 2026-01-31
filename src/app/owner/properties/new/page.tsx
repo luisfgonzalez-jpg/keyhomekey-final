@@ -25,6 +25,13 @@ export default function NewPropertyPage() {
   const [contractEnd, setContractEnd] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Phone validation states
+  const [ownerPhoneError, setOwnerPhoneError] = useState('');
+  const [tenantPhoneError, setTenantPhoneError] = useState('');
+
+  // Date validation state
+  const [dateError, setDateError] = useState('');
+
   const router = useRouter();
 
   const departments: DepartmentOption[] = colombiaLocations;
@@ -40,11 +47,202 @@ export default function NewPropertyPage() {
     }
   }, [department, departments, city]);
 
+  // Phone validation function
+  const validateColombianPhone = (phone: string): { valid: boolean; formatted: string; error?: string } => {
+    // Remove all non-numeric characters
+    const cleaned = phone.replace(/\D/g, '');
+    
+    // Check if it already has country code
+    let phoneNumber = cleaned;
+    
+    // If starts with 57, it has country code
+    if (cleaned.startsWith('57')) {
+      phoneNumber = cleaned.substring(2);
+    }
+    
+    // Colombian mobile numbers: 10 digits starting with 3
+    // Colombian landline: 7 digits (Bogotá) or 8 digits (other cities)
+    
+    if (phoneNumber.length === 10 && phoneNumber.startsWith('3')) {
+      // Valid mobile number
+      return {
+        valid: true,
+        formatted: `+57 ${phoneNumber.substring(0, 3)} ${phoneNumber.substring(3, 6)} ${phoneNumber.substring(6)}`
+      };
+    } else if (phoneNumber.length === 7 || phoneNumber.length === 8) {
+      // Valid landline
+      return {
+        valid: true,
+        formatted: `+57 (${phoneNumber.substring(0, 1)}) ${phoneNumber.substring(1)}`
+      };
+    } else {
+      return {
+        valid: false,
+        formatted: phone,
+        error: 'Número inválido. Formato móvil: 3XX XXX XXXX o fijo: (X)XX XXXXX'
+      };
+    }
+  };
+
+  // Owner phone validation handler
+  const handleOwnerPhoneChange = (value: string) => {
+    setOwnerPhone(value);
+    
+    if (value.length >= 7) {
+      const validation = validateColombianPhone(value);
+      if (!validation.valid && validation.error) {
+        setOwnerPhoneError(validation.error);
+      } else {
+        setOwnerPhoneError('');
+      }
+    } else {
+      setOwnerPhoneError('');
+    }
+  };
+
+  // Owner phone blur handler for auto-formatting
+  const handleOwnerPhoneBlur = () => {
+    if (ownerPhone && ownerPhone.length >= 7) {
+      const validation = validateColombianPhone(ownerPhone);
+      if (validation.valid) {
+        setOwnerPhone(validation.formatted);
+      }
+    }
+  };
+
+  // Tenant phone validation handler
+  const handleTenantPhoneChange = (value: string) => {
+    setTenantPhone(value);
+    
+    if (value.length >= 7) {
+      const validation = validateColombianPhone(value);
+      if (!validation.valid && validation.error) {
+        setTenantPhoneError(validation.error);
+      } else {
+        setTenantPhoneError('');
+      }
+    } else {
+      setTenantPhoneError('');
+    }
+  };
+
+  // Tenant phone blur handler for auto-formatting
+  const handleTenantPhoneBlur = () => {
+    if (tenantPhone && tenantPhone.length >= 7) {
+      const validation = validateColombianPhone(tenantPhone);
+      if (validation.valid) {
+        setTenantPhone(validation.formatted);
+      }
+    }
+  };
+
+  // Date validation function
+  const validateContractDates = (start: string, end: string): { valid: boolean; error?: string } => {
+    if (!start || !end) {
+      return { valid: true }; // Optional dates are ok
+    }
+
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time for comparison
+
+    // Check if end date is after start date
+    if (endDate <= startDate) {
+      return {
+        valid: false,
+        error: 'La fecha de finalización debe ser posterior a la fecha de inicio'
+      };
+    }
+
+    // Check if start date is not too far in the past (more than 10 years)
+    const tenYearsAgo = new Date();
+    tenYearsAgo.setFullYear(tenYearsAgo.getFullYear() - 10);
+    tenYearsAgo.setHours(0, 0, 0, 0); // Reset time for comparison
+    
+    if (startDate < tenYearsAgo) {
+      return {
+        valid: false,
+        error: 'La fecha de inicio no puede ser hace más de 10 años'
+      };
+    }
+
+    // Check if end date is not too far in future (more than 10 years)
+    const tenYearsFromNow = new Date();
+    tenYearsFromNow.setFullYear(tenYearsFromNow.getFullYear() + 10);
+    tenYearsFromNow.setHours(0, 0, 0, 0); // Reset time for comparison
+    
+    if (endDate > tenYearsFromNow) {
+      return {
+        valid: false,
+        error: 'La fecha de finalización no puede ser más de 10 años en el futuro'
+      };
+    }
+
+    // Warn if contract is ending soon (within 30 days)
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    thirtyDaysFromNow.setHours(0, 0, 0, 0); // Reset time for comparison
+    
+    if (endDate <= thirtyDaysFromNow && endDate >= today) {
+      // This is a warning, not an error
+      return {
+        valid: true,
+        error: '⚠️ El contrato vence en menos de 30 días'
+      };
+    }
+
+    return { valid: true };
+  };
+
+  // Date change handlers
+  const handleDateChange = (field: 'start' | 'end', value: string) => {
+    if (field === 'start') {
+      setContractStart(value);
+    } else {
+      setContractEnd(value);
+    }
+
+    // Validate after both dates are set
+    const start = field === 'start' ? value : contractStart;
+    const end = field === 'end' ? value : contractEnd;
+    
+    if (start && end) {
+      const validation = validateContractDates(start, end);
+      setDateError(validation.error || '');
+    } else {
+      setDateError('');
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     setLoading(true);
     try {
+      // Validate phone numbers
+      if (ownerPhoneError) {
+        alert('Por favor corrige el teléfono del propietario');
+        setLoading(false);
+        return;
+      }
+
+      if (isRented && tenantPhone && tenantPhoneError) {
+        alert('Por favor corrige el teléfono del inquilino');
+        setLoading(false);
+        return;
+      }
+
+      // Validate dates if rented
+      if (isRented && contractStart && contractEnd) {
+        const dateValidation = validateContractDates(contractStart, contractEnd);
+        if (!dateValidation.valid) {
+          alert(`Error en las fechas: ${dateValidation.error}`);
+          setLoading(false);
+          return;
+        }
+      }
+
       // 1. Obtener usuario actual
       const {
         data: { user },
@@ -65,7 +263,21 @@ export default function NewPropertyPage() {
         return;
       }
 
-      // 2. Preparar payload de la propiedad
+      // 2. Validate tenant email before proceeding (if property is rented and email is provided)
+      if (isRented && tenantEmail) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(tenantEmail.trim())) {
+          console.error('❌ Invalid tenant email format:', tenantEmail);
+          alert('Error: El formato del email del inquilino es inválido');
+          setLoading(false);
+          return;
+        }
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ Tenant email validated:', tenantEmail.trim());
+        }
+      }
+
+      // 3. Preparar payload de la propiedad
       const payload = {
         owner_id: user.id,
         address: address.trim(),
@@ -80,7 +292,7 @@ export default function NewPropertyPage() {
         contract_end: isRented && contractEnd ? contractEnd : null,
       };
 
-      // 3. Insert en Supabase
+      // 4. Insert en Supabase
       const { error } = await supabase.from('properties').insert([payload]);
 
       if (error) {
@@ -90,10 +302,15 @@ export default function NewPropertyPage() {
         return;
       }
 
-      // 4. Send welcome email to tenant if property is rented and email is provided
+      // 5. Send welcome email to tenant if property is rented and email is provided
       let emailSent = false;
       if (isRented && tenantEmail) {
         try {
+          // Debug logging (only in development)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('📧 Sending welcome email to tenant');
+          }
+
           // Get owner profile for full name
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -109,7 +326,7 @@ export default function NewPropertyPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              to: tenantEmail,
+              to: tenantEmail.trim(),
               subject: '¡Bienvenido/a a KeyHomeKey! Tu nueva herramienta de gestión',
               template: 'tenantWelcome',
               variables: {
@@ -130,9 +347,13 @@ export default function NewPropertyPage() {
           if (!emailResponse.ok) {
             const errorText = await emailResponse.text();
             console.error('❌ Error sending welcome email:', errorText);
-            // No bloquear el flujo si falla el email
+            // Don't block flow if email fails
           } else {
-            console.log('✅ Welcome email sent to tenant');
+            if (process.env.NODE_ENV === 'development') {
+              const result = await emailResponse.json();
+              console.log('✅ Welcome email sent successfully');
+              console.log('📧 Email ID:', result.data?.emailId);
+            }
             emailSent = true;
           }
         } catch (emailError) {
@@ -223,11 +444,16 @@ export default function NewPropertyPage() {
               <input
                 type="tel"
                 value={ownerPhone}
-                onChange={(e) => setOwnerPhone(e.target.value)}
+                onChange={(e) => handleOwnerPhoneChange(e.target.value)}
+                onBlur={handleOwnerPhoneBlur}
                 required
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
-                placeholder="3100000000"
+                className={`w-full rounded-lg border ${ownerPhoneError ? 'border-red-300' : 'border-slate-200'} px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200`}
+                placeholder="3XX XXX XXXX"
               />
+              {ownerPhoneError && (
+                <p className="text-xs text-red-600">{ownerPhoneError}</p>
+              )}
+              <p className="text-xs text-slate-500">Formato: 3XX XXX XXXX (móvil) o XXXXXXX (fijo)</p>
             </div>
           </div>
         </section>
@@ -331,9 +557,14 @@ export default function NewPropertyPage() {
                 <input
                   type="tel"
                   value={tenantPhone}
-                  onChange={(e) => setTenantPhone(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                  onChange={(e) => handleTenantPhoneChange(e.target.value)}
+                  onBlur={handleTenantPhoneBlur}
+                  className={`w-full rounded-lg border ${tenantPhoneError ? 'border-red-300' : 'border-slate-200'} px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200`}
+                  placeholder="3XX XXX XXXX"
                 />
+                {tenantPhoneError && (
+                  <p className="text-xs text-red-600">{tenantPhoneError}</p>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -357,8 +588,9 @@ export default function NewPropertyPage() {
                 <input
                   type="date"
                   value={contractStart}
-                  onChange={(e) => setContractStart(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                  onChange={(e) => handleDateChange('start', e.target.value)}
+                  max={contractEnd || undefined} // Can't be after end date
+                  className={`w-full rounded-lg border ${dateError && !dateError.includes('⚠️') ? 'border-red-300' : 'border-slate-200'} px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200`}
                 />
               </div>
 
@@ -369,10 +601,20 @@ export default function NewPropertyPage() {
                 <input
                   type="date"
                   value={contractEnd}
-                  onChange={(e) => setContractEnd(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                  onChange={(e) => handleDateChange('end', e.target.value)}
+                  min={contractStart || undefined} // Can't be before start date
+                  className={`w-full rounded-lg border ${dateError && !dateError.includes('⚠️') ? 'border-red-300' : 'border-slate-200'} px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200`}
                 />
               </div>
+
+              {/* Date error/warning message */}
+              {dateError && (
+                <div className={`col-span-2 p-3 rounded-lg ${dateError.includes('⚠️') ? 'bg-yellow-50 border border-yellow-200' : 'bg-red-50 border border-red-200'}`}>
+                  <p className={`text-xs ${dateError.includes('⚠️') ? 'text-yellow-800' : 'text-red-600'}`}>
+                    {dateError}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </section>

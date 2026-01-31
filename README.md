@@ -32,18 +32,49 @@ This project requires the following environment variables to be set:
 ### Required for Email Notifications
 
 - `RESEND_API_KEY` - Your Resend API key for sending emails
+- `RESEND_FROM_EMAIL` - (Optional) Sender email address. Defaults to `delivered@resend.dev` if not set
+
+### Email Service (Resend)
+
+KeyHomeKey uses [Resend](https://resend.com) for sending transactional emails.
+
+#### Setup Instructions:
+
+1. **Create a Resend account** at https://resend.com
+2. **Get your API key** from the [API Keys page](https://resend.com/api-keys)
+3. **Configure sender email**:
+
+   **For Development/Testing:**
+   ```bash
+   RESEND_API_KEY=re_your_api_key_here
+   RESEND_FROM_EMAIL=delivered@resend.dev
+   ```
+
+   **For Production:**
+   - Go to [Resend Domains](https://resend.com/domains)
+   - Click "Add Domain" and enter your domain (e.g., `keyhomekey.com`)
+   - Add the provided DNS records to your domain provider
+   - Wait for verification (usually 5-15 minutes)
+   - Use your verified domain in the environment variable:
+   ```bash
+   RESEND_API_KEY=re_your_api_key_here
+   RESEND_FROM_EMAIL=KeyHomeKey <noreply@keyhomekey.com>
+   ```
+
+#### Email Templates Available:
+- `tenantWelcome` - Welcome email sent to new tenants
+- `tenantInvitation` - Property invitation email
+- `invitation` - General invitation email
+
+#### Troubleshooting:
+- **Error 400**: Sender email not verified → Verify domain in Resend dashboard
+- **Error 401**: Invalid API key → Check `RESEND_API_KEY` in environment variables
+- **Emails not arriving**: Check spam folder, verify recipient email format
 
 ### Required for Retel AI Provider Matching
 
 - `RETEL_API_KEY` - Your Retel AI API key for external provider matching
 - `RETEL_API_URL` - (Optional) Custom Retel AI API URL. Defaults to `https://api.retel.ai/v1/providers/search`
-
-### Required for Google Provider Search
-
-- `GOOGLE_CUSTOM_SEARCH_API_KEY` - Your Google Custom Search API key for searching external providers
-- `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` - Your Google Custom Search Engine ID
-
-See the [Google Custom Search Setup Guide](#google-custom-search-setup) below for detailed instructions.
 
 ### Required for WhatsApp Business Integration
 
@@ -63,8 +94,6 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 RESEND_API_KEY=your-resend-key
 RETEL_API_KEY=your-retel-key
-GOOGLE_CUSTOM_SEARCH_API_KEY=your-google-api-key
-GOOGLE_CUSTOM_SEARCH_ENGINE_ID=your-search-engine-id
 WHATSAPP_TOKEN=your-whatsapp-token
 WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=your-verify-token
@@ -215,6 +244,12 @@ The application provides two WhatsApp-related endpoints:
 
 ### Troubleshooting
 
+**"Permission denied for table users" errors:**
+- This is fixed by applying the migration `20260124000000_fix_comments_rls_policies.sql`
+- If you see this error, ensure both migrations are applied in order
+- The fix uses JWT token data instead of querying the `auth.users` table
+- Verify by running: `supabase db push` or applying the migration manually
+
 **Webhook verification fails:**
 - Ensure `WHATSAPP_WEBHOOK_VERIFY_TOKEN` matches the token in Meta console
 - Check that your webhook URL is publicly accessible (not localhost)
@@ -239,171 +274,73 @@ The application provides two WhatsApp-related endpoints:
 - [Webhook Setup Guide](https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks)
 - [Message Templates](https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates)
 
-## Google Custom Search Setup
+## Ticket Comments and Activity Timeline
 
-This application can search for external service providers using Google's Custom Search API. When a ticket is created, the system will:
-1. Search internal providers in the database
-2. Search external providers via Google based on category and location
-3. Store external provider suggestions in the ticket metadata
+This application includes a complete ticket comment system with real-time updates and WhatsApp notifications.
 
-**⚠️ Important**: This feature requires a database schema update. See [DATABASE_MIGRATION.md](./DATABASE_MIGRATION.md) for migration instructions.
+### Features
 
-### Prerequisites
+- **Real-time Updates**: Comments appear instantly using Supabase Realtime
+- **File Attachments**: Upload images, videos, and documents with each comment
+- **WhatsApp Notifications**: Automatic notifications sent to relevant parties when new comments are added
+- **Role-based Display**: Comments show user avatars and role badges (Owner, Tenant, Provider)
+- **Timeline View**: Chronological display of all activity with relative timestamps
 
-1. A Google Cloud Platform account ([create one here](https://console.cloud.google.com/))
-2. Billing enabled on your Google Cloud project (Custom Search API has a free tier)
+### Database Setup
 
-### Step 1: Enable Google Custom Search API
+1. Apply the database migrations to create the `ticket_comments` table and fix RLS policies:
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Navigate to **APIs & Services** → **Library**
-4. Search for "Custom Search API"
-5. Click on **Custom Search API** and click **Enable**
+```bash
+# If using Supabase CLI
+supabase db push
 
-### Step 2: Create API Credentials
+# Or apply manually in Supabase SQL Editor
+# First, run: supabase/migrations/20260123000000_add_ticket_comments.sql
+# Then, run: supabase/migrations/20260124000000_fix_comments_rls_policies.sql
+```
 
-1. Go to **APIs & Services** → **Credentials**
-2. Click **Create Credentials** → **API key**
-3. Copy the generated API key
-4. (Recommended) Click **Restrict key** to add restrictions:
-   - Under "API restrictions", select "Restrict key"
-   - Choose "Custom Search API" from the dropdown
-   - Click **Save**
-5. Add to your environment variables:
-   ```bash
-   GOOGLE_CUSTOM_SEARCH_API_KEY=your-generated-api-key
-   ```
+**Important:** The second migration (20260124000000) is required to fix "permission denied for table users" errors. It updates RLS policies to use JWT token data instead of querying the `auth.users` table.
 
-### Step 3: Create a Programmable Search Engine
+2. Ensure you have a storage bucket named `tickets-media` in Supabase for file uploads
 
-1. Go to [Programmable Search Engine](https://programmablesearchengine.google.com/)
-2. Click **Get started** or **Add** to create a new search engine
-3. Configure your search engine:
-   - **Sites to search**: Enter `www.google.com` or leave blank to search the entire web
-   - **Name**: e.g., "KeyHomeKey Provider Search"
-   - **Language**: Spanish (or your preferred language)
-4. Click **Create**
-5. After creation, click on your search engine to edit it
-6. Enable **Search the entire web** (if not already enabled)
-7. Copy the **Search engine ID** (looks like: `a1b2c3d4e5f6g7h8i`)
-8. Add to your environment variables:
-   ```bash
-   GOOGLE_CUSTOM_SEARCH_ENGINE_ID=your-search-engine-id
-   ```
+### Usage in Your Application
 
-### Step 4: Configure Search Parameters (Optional)
+Import and use the `TicketTimeline` component on your ticket detail pages:
 
-To improve search results for Colombian service providers:
+```tsx
+import TicketTimeline from '@/components/TicketTimeline';
 
-1. In your Programmable Search Engine settings, go to **Setup** → **Advanced**
-2. Under **Sites to search**, you can add specific sites:
-   - `paginasamarillas.com.co` - Colombian yellow pages
-   - `olx.com.co` - Classified ads
-   - `locanto.com.co` - Local services
-3. Adjust **SafeSearch** settings as needed
-
-### Step 5: Test Your Integration
-
-1. **Test the API endpoint directly**:
-   ```bash
-   curl -X POST https://your-domain.com/api/providers/google-search \
-     -H "Content-Type: application/json" \
-     -d '{
-       "category": "Plomería",
-       "location": {
-         "department": "Cundinamarca",
-         "municipality": "Bogotá"
-       },
-       "description": "Fuga de agua en cocina"
-     }'
-   ```
-
-2. **Create a ticket and check the response**:
-   - The response will include `externalProviders` array with Google search results
-   - Check your application logs for search queries and results
-
-### Pricing and Limits
-
-**Google Custom Search API Pricing:**
-- **Free tier**: 100 search queries per day
-- **Paid tier**: $5 per 1,000 queries (after free tier)
-- [View detailed pricing](https://developers.google.com/custom-search/v1/overview#pricing)
-
-**Best Practices:**
-- Cache search results when possible
-- Only search when internal providers are not found (optional)
-- Monitor your usage in Google Cloud Console
+// Inside your ticket detail component
+<TicketTimeline ticketId={ticket.id} />
+```
 
 ### API Endpoints
 
-The application provides the following endpoints for provider search:
+**GET `/api/tickets/[id]/comments`**
+- Fetches all comments for a specific ticket
+- Respects Row Level Security (RLS) policies
+- Returns comments in reverse chronological order
 
-1. **POST `/api/providers/google-search`** - Search external providers
-   ```typescript
-   {
-     "category": "Plomería",        // Service category
-     "location": {
-       "department": "Cundinamarca",
-       "municipality": "Bogotá"
-     },
-     "description": "Optional description for context"
-   }
-   ```
-   
-   Response:
-   ```typescript
-   {
-     "success": true,
-     "providers": [
-       {
-         "name": "Provider name",
-         "description": "Provider description",
-         "url": "https://provider-website.com",
-         "source": "google",
-         "location": "Bogotá, Cundinamarca"
-       }
-     ],
-     "searchQuery": "plomería en Bogotá Cundinamarca Colombia servicios profesionales"
-   }
-   ```
+**POST `/api/tickets/[id]/comments`**
+- Creates a new comment on a ticket
+- Accepts optional `media_urls` array for file attachments
+- Automatically sends WhatsApp notifications to ticket participants (excluding comment author)
+- Returns the created comment
 
-2. **POST `/api/tickets`** - Create ticket (automatically searches providers)
-   - Searches internal providers first
-   - Then searches external providers via Google
-   - Returns both internal and external provider matches
-   - Stores external providers in ticket metadata
+Request body:
+```json
+{
+  "comment_text": "Your comment text",
+  "media_urls": ["url1", "url2"],  // optional
+  "comment_type": "comment"  // or 'status_change', 'provider_assigned', 'media_added'
+}
+```
 
-### Troubleshooting
+### Security
 
-**API returns 403 Forbidden:**
-- Check that Custom Search API is enabled in Google Cloud Console
-- Verify API key restrictions allow Custom Search API
-- Ensure billing is enabled on your Google Cloud project
-
-**No results returned:**
-- Verify Search Engine ID is correct
-- Check that "Search the entire web" is enabled
-- Try different search queries or keywords
-- Review search engine settings in Programmable Search Engine console
-
-**Rate limit exceeded:**
-- You've exceeded the free tier limit (100 queries/day)
-- Consider implementing caching
-- Upgrade to paid tier if needed
-
-**Invalid Search Engine ID:**
-- Ensure you copied the correct Search Engine ID from the Programmable Search Engine console
-- ID should be alphanumeric (no special characters)
-
-### Resources
-
-- [WhatsApp Business Platform Documentation](https://developers.facebook.com/docs/whatsapp)
-- [Cloud API Quick Start](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started)
-- [Webhook Setup Guide](https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks)
-- [Message Templates](https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates)
-- [Google Custom Search API Documentation](https://developers.google.com/custom-search/v1/overview)
-- [Programmable Search Engine](https://programmablesearchengine.google.com/)
+- **Row Level Security (RLS)**: Only users associated with a ticket can view/add comments
+- **Authentication Required**: All endpoints require valid Supabase authentication
+- **Secure File Storage**: Files are uploaded to Supabase storage with unique UUIDs
 
 ## Learn More
 
@@ -425,13 +362,12 @@ When deploying to Vercel, add the following environment variables in your projec
 1. `NEXT_PUBLIC_SUPABASE_URL`
 2. `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 3. `RESEND_API_KEY`
-4. `RETEL_API_KEY`
-5. `GOOGLE_CUSTOM_SEARCH_API_KEY`
-6. `GOOGLE_CUSTOM_SEARCH_ENGINE_ID`
-7. `WHATSAPP_TOKEN`
-8. `WHATSAPP_PHONE_NUMBER_ID`
-9. `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
-10. `INTERNAL_API_KEY`
+4. `RESEND_FROM_EMAIL` (Optional, defaults to `delivered@resend.dev`)
+5. `RETEL_API_KEY`
+6. `WHATSAPP_TOKEN`
+7. `WHATSAPP_PHONE_NUMBER_ID`
+8. `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
+9. `INTERNAL_API_KEY`
 
 **Important for WhatsApp Integration on Vercel:**
 - After deployment, update your webhook URL in the Meta Developer Console to point to your Vercel domain
