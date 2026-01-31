@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 // 1. Asegúrate de tener estas variables en tu archivo .env.local
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -9,7 +9,4 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // 2. Creamos y exportamos el cliente de Supabase
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-
-
+export const createClient = () => createSupabaseClient(supabaseUrl, supabaseAnonKey)

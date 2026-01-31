@@ -1,6 +1,8 @@
 // /app/api/tickets/route.ts
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { searchExternalProviders } from '@/lib/googleProviderSearch';
+import type { ExternalProvider } from '@/type/googleProvider';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -88,17 +90,91 @@ export async function POST(request: Request) {
     if (error) throw error;
 
     // ---------------------------------------------------------------------
+    // Buscar proveedor interno y externos
+    // ---------------------------------------------------------------------
+    let whatsappNumber = KEYHOME_WHATSAPP;
+    let providerLabel = 'KeyhomeKey';
+    let externalProviders: ExternalProvider[] = [];
+
+    // Obtener propiedad para matching
+    const { data: property } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('id', propertyId)
+      .single();
+
+    if (property) {
+      try {
+        // Buscar proveedor interno en la base de datos
+        const { data: providers } = await supabase
+          .from('providers')
+          .select('name, phone, specialty, department, municipality, is_active')
+          .eq('department', property.department)
+          .eq('municipality', property.municipality)
+          .eq('specialty', category)
+          .eq('is_active', true)
+          .limit(1);
+
+        if (providers && providers.length > 0) {
+          const provider = providers[0] as any;
+          providerLabel = provider.name || 'Proveedor';
+          if (provider.phone) {
+            const digits = String(provider.phone).replace(/\D/g, '');
+            whatsappNumber = digits.startsWith('57') ? digits : `57${digits}`;
+          }
+          console.log(`✅ Internal provider found: ${providerLabel}`);
+        } else {
+          console.log('ℹ️ No internal provider found, searching external providers...');
+        }
+
+        // Buscar proveedores externos via Google (siempre, para tener opciones adicionales)
+        try {
+          externalProviders = await searchExternalProviders({
+            category,
+            location: {
+              department: property.department,
+              municipality: property.municipality,
+            },
+            description,
+          });
+
+          // Guardar proveedores externos en el ticket como metadata
+          if (externalProviders.length > 0) {
+            try {
+              await supabase
+                .from('tickets')
+                .update({
+                  external_providers: externalProviders,
+                })
+                .eq('id', ticket.id);
+              
+              console.log(`✅ Stored ${externalProviders.length} external providers in ticket metadata`);
+            } catch (updateErr) {
+              console.warn('⚠️ Could not store external providers in database. Column may not exist.', updateErr);
+            }
+          }
+        } catch (extErr) {
+          console.error('Error searching external providers:', extErr);
+        }
+      } catch (err) {
+        console.error('Error finding provider:', err);
+      }
+    }
+
+    // ---------------------------------------------------------------------
     // Enviar notificación por WhatsApp con texto + adjuntos (si existen)
     // ---------------------------------------------------------------------
     try {
-      const normalizedTo = normalizePhoneNumber(KEYHOME_WHATSAPP);
+      const normalizedTo = normalizePhoneNumber(whatsappNumber);
 
       const message = `Nuevo ticket registrado\n\n` +
         `Categoría: ${category}\n` +
         `Prioridad: ${priority}\n` +
-        `Inmueble: ${propertyId}\n` +
+        `Inmueble: ${property?.address || propertyId}\n` +
+        `Ubicación: ${property?.municipality || ''}, ${property?.department || ''}\n` +
         `Descripción: ${description}\n` +
-        `Reportado por: ${reporter}${reported_by_email ? ` (${reported_by_email})` : ''}`;
+        `Reportado por: ${reporter}${reported_by_email ? ` (${reported_by_email})` : ''}\n` +
+        `Asignado a: ${providerLabel}`;
 
       const mediaPayload: MediaAttachment[] = [];
 
@@ -168,7 +244,12 @@ export async function POST(request: Request) {
       console.error('No se pudo enviar WhatsApp:', notifyError);
     }
 
-    return NextResponse.json({ success: true, ticket });
+    return NextResponse.json({ 
+      success: true, 
+      ticket,
+      externalProviders: externalProviders.length > 0 ? externalProviders : undefined,
+      internalProviderFound: providerLabel !== 'KeyhomeKey',
+    });
   } catch (error: any) {
     console.error('Error creating ticket:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
