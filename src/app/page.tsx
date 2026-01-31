@@ -74,8 +74,11 @@ const Button = ({
 // Ticket interface
 interface Ticket {
   id: string;
+  property_id?: string;
   title: string;
   description: string;
+  category?: string;
+  priority?: string;
   status: string;
   reporter: string;
   reported_by_email?: string;
@@ -85,6 +88,15 @@ interface Ticket {
 
 // Types
 type Role = 'OWNER' | 'TENANT' | 'PROVIDER' | null;
+
+interface User {
+  id: string;
+  email?: string;
+}
+
+interface Profile {
+  role?: string;
+}
 
 interface Property {
   id: string;
@@ -189,8 +201,13 @@ const StatusBadge = ({ status }: { status: string }) => {
 // -----------------------------------------------------------------------------
 
 export default function HomePage() {
+  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [userRole, setUserRole] = useState<Role>(null);
+  const [view, setView] = useState<'login' | 'dashboard'>('login');
+  const [loading, setLoading] = useState(false);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketFiles, setTicketFiles] = useState<File[]>([]);
 
@@ -495,12 +512,12 @@ export default function HomePage() {
 
       if (role === 'OWNER') {
         const propIds = new Set(propsData.map((p) => p.id));
-        setTickets(allTickets.filter((t) => propIds.has(t.property_id)));
+        setTickets(allTickets.filter((t) => t.property_id && propIds.has(t.property_id)));
       } else if (role === 'TENANT') {
         const propIds = new Set(propsData.map((p) => p.id));
         setTickets(
           allTickets.filter(
-            (t) => propIds.has(t.property_id) || t.reporter === 'Inquilino',
+            (t) => (t.property_id && propIds.has(t.property_id)) || t.reporter === 'Inquilino',
           ),
         );
       } else if (role === 'PROVIDER') {
@@ -1097,6 +1114,7 @@ export default function HomePage() {
                     <option value="high">High</option>
                   </select>
                 </div>
+              </div>
 
               <div>
                 <label className="block text-[11px] text-slate-500 mb-1">
