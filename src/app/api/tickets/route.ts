@@ -96,6 +96,7 @@ export async function POST(request: Request) {
     let providerLabel = 'KeyhomeKey';
     let externalProviders: ExternalProvider[] = [];
     let providers: any[] | null = null;
+    let assignedProviderId: string | null = null;
 
     // Obtener propiedad para matching
     const { data: property } = await supabase
@@ -124,13 +125,14 @@ export async function POST(request: Request) {
           
           // Asignar el proveedor al ticket
           if (provider.id) {
+            assignedProviderId = provider.id;
             try {
               await supabase
                 .from('tickets')
-                .update({ assigned_provider_id: provider.id })
+                .update({ assigned_provider_id: assignedProviderId })
                 .eq('id', ticket.id);
               
-              console.log(`✅ Ticket assigned to provider: ${provider.id} (${providerLabel})`);
+              console.log(`✅ Ticket assigned to provider: ${assignedProviderId} (${providerLabel})`);
             } catch (assignErr) {
               console.error('⚠️ Could not assign provider to ticket:', assignErr);
             }
@@ -265,7 +267,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       success: true, 
       ticket,
-      assignedProviderId: providers && providers.length > 0 ? providers[0].id : null,
+      assignedProviderId,
       externalProviders: externalProviders.length > 0 ? externalProviders : undefined,
       internalProviderFound: providerLabel !== 'KeyhomeKey',
     });
