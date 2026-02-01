@@ -95,6 +95,8 @@ export async function POST(request: Request) {
     let whatsappNumber = KEYHOME_WHATSAPP;
     let providerLabel = 'KeyhomeKey';
     let externalProviders: ExternalProvider[] = [];
+    let providers: any[] | null = null;
+    let assignedProviderId: string | null = null;
 
     // Obtener propiedad para matching
     const { data: property } = await supabase
@@ -106,18 +108,36 @@ export async function POST(request: Request) {
     if (property) {
       try {
         // Buscar proveedor interno en la base de datos
-        const { data: providers } = await supabase
+        const providerResult = await supabase
           .from('providers')
-          .select('name, phone, specialty, department, municipality, is_active')
+          .select('id, name, phone, specialty, department, municipality, is_active')
           .eq('department', property.department)
           .eq('municipality', property.municipality)
           .eq('specialty', category)
           .eq('is_active', true)
           .limit(1);
+        
+        providers = providerResult.data;
 
         if (providers && providers.length > 0) {
           const provider = providers[0] as any;
           providerLabel = provider.name || 'Proveedor';
+          
+          // Asignar el proveedor al ticket
+          if (provider.id) {
+            assignedProviderId = provider.id;
+            try {
+              await supabase
+                .from('tickets')
+                .update({ assigned_provider_id: assignedProviderId })
+                .eq('id', ticket.id);
+              
+              console.log(`✅ Ticket assigned to provider: ${assignedProviderId} (${providerLabel})`);
+            } catch (assignErr) {
+              console.error('⚠️ Could not assign provider to ticket:', assignErr);
+            }
+          }
+          
           if (provider.phone) {
             const digits = String(provider.phone).replace(/\D/g, '');
             whatsappNumber = digits.startsWith('57') ? digits : `57${digits}`;
@@ -247,6 +267,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       success: true, 
       ticket,
+      assignedProviderId,
       externalProviders: externalProviders.length > 0 ? externalProviders : undefined,
       internalProviderFound: providerLabel !== 'KeyhomeKey',
     });
