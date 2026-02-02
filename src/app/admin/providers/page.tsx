@@ -52,7 +52,8 @@ export default function ProvidersPage() {
 
   useEffect(() => {
     if (formData.department) {
-      const cities = colombiaLocations[formData.department] || [];
+      const found = colombiaLocations.find((d) => d.departamento === formData.department);
+      const cities = found?.ciudades || [];
       setAvailableCities(cities);
       if (!cities.includes(formData.municipality)) {
         setFormData(prev => ({ ...prev, municipality: cities[0] || '' }));
@@ -311,8 +312,8 @@ export default function ProvidersPage() {
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Selecciona departamento</option>
-                  {Object.keys(colombiaLocations).map((dept) => (
-                    <option key={dept} value={dept}>{dept}</option>
+                  {colombiaLocations.map((loc) => (
+                    <option key={loc.departamento} value={loc.departamento}>{loc.departamento}</option>
                   ))}
                 </select>
               </div>
