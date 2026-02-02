@@ -282,9 +282,15 @@ export async function POST(request: Request) {
       console.error('No se pudo enviar WhatsApp:', notifyError);
     }
 
+    // Agregar el nombre del proveedor al ticket antes de retornar
+    const ticketWithProvider = {
+      ...ticket,
+      assigned_provider_name: providerLabel !== 'KeyhomeKey' ? providerLabel : null,
+    };
+
     return NextResponse.json({ 
       success: true, 
-      ticket,
+      ticket: ticketWithProvider,
       assignedProviderId,
       externalProviders: externalProviders.length > 0 ? externalProviders : undefined,
       internalProviderFound: providerLabel !== 'KeyhomeKey',

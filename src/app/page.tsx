@@ -77,6 +77,8 @@ interface Ticket {
   media_urls?: string[];
   media_info?: MediaInfo[];
   created_at?: string;
+  assigned_provider_id?: string;
+  assigned_provider_name?: string;
 }
 
 type Role = 'OWNER' | 'TENANT' | 'PROVIDER' | 'ADMIN' | null;
@@ -1195,11 +1197,48 @@ export default function HomePage() {
       setProperties(propsData);
 
       const { data: ticketsData } = await supabase.from('tickets').select('*').order('created_at', { ascending: false });
-      const allTickets = (ticketsData || []) as Ticket[];
+      let allTickets = (ticketsData || []) as Ticket[];
       
       console.log('📋 Tickets cargados:', allTickets.length);
       console.log('📎 Primer ticket media_urls:', allTickets[0]?.media_urls);
       console.log('📎 Primer ticket media_info:', allTickets[0]?.media_info);
+
+      // Enriquecer tickets con información del proveedor
+      const ticketsWithProviders = await Promise.all(
+        allTickets.map(async (ticket) => {
+          if (ticket.assigned_provider_id) {
+            try {
+              // Obtener provider para conseguir user_id
+              const { data: provider } = await supabase
+                .from('providers')
+                .select('user_id')
+                .eq('id', ticket.assigned_provider_id)
+                .maybeSingle();
+
+              if (provider?.user_id) {
+                // Obtener nombre del proveedor desde profiles
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('full_name')
+                  .eq('id', provider.user_id)
+                  .maybeSingle();
+
+                if (profile?.full_name) {
+                  return {
+                    ...ticket,
+                    assigned_provider_name: profile.full_name,
+                  };
+                }
+              }
+            } catch (err) {
+              console.warn('Error fetching provider name for ticket:', ticket.id, err);
+            }
+          }
+          return ticket;
+        })
+      );
+
+      allTickets = ticketsWithProviders;
 
       if (role === 'OWNER' || role === 'TENANT') {
         const propIds = new Set(propsData.map((p) => p.id));
@@ -2838,6 +2877,15 @@ export default function HomePage() {
                     <p className="text-xs text-[#64748B] mb-1">Reportado por</p>
                     <p className="text-sm font-semibold text-[#1E293B]">{selectedTicket.reporter}</p>
                     <p className="text-xs text-[#64748B]">{selectedTicket.reported_by_email}</p>
+                  </div>
+                  <div className="p-3 bg-[#F8FAFC] rounded-xl">
+                    <p className="text-xs text-[#64748B] mb-1">Asignado a</p>
+                    <p className="text-sm font-semibold text-[#1E293B]">
+                      {selectedTicket.assigned_provider_name || 'KeyhomeKey'}
+                    </p>
+                    {selectedTicket.assigned_provider_id && (
+                      <p className="text-xs text-[#64748B]">Proveedor interno</p>
+                    )}
                   </div>
                   <div className="p-3 bg-[#F8FAFC] rounded-xl">
                     <p className="text-xs text-[#64748B] mb-1">Fecha de creación</p>
