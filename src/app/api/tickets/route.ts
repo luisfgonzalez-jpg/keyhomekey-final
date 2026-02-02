@@ -107,6 +107,13 @@ export async function POST(request: Request) {
 
     if (property) {
       try {
+        console.log('🔍 Buscando proveedor con criterios:', {
+          department: property.department,
+          municipality: property.municipality,
+          category,
+          is_active: true
+        });
+
         // Buscar proveedor interno en la base de datos
         const providerResult = await supabase
           .from('providers')
@@ -117,6 +124,12 @@ export async function POST(request: Request) {
           .eq('is_active', true)
           .limit(1);
         
+        console.log('📊 Resultado búsqueda providers:', {
+          found: providerResult.data?.length || 0,
+          error: providerResult.error,
+          data: providerResult.data
+        });
+
         providers = providerResult.data;
 
         if (providers && providers.length > 0) {
