@@ -126,13 +126,13 @@ export async function POST(request: Request) {
           if (provider.user_id) {
             try {
               const { data: userProfile } = await supabase
-                .from('users_profiles')
-                .select('name')
-                .eq('user_id', provider.user_id)
+                .from('profiles')
+                .select('full_name')
+                .eq('id', provider.user_id)
                 .maybeSingle();
               
-              if (userProfile?.name) {
-                providerName = userProfile.name;
+              if (userProfile?.full_name) {
+                providerName = userProfile.full_name;
               }
             } catch (nameErr) {
               console.warn('⚠️ Could not fetch provider name:', nameErr);
