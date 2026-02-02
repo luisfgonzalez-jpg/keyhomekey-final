@@ -110,7 +110,7 @@ export async function POST(request: Request) {
         // Buscar proveedor interno en la base de datos
         const providerResult = await supabase
           .from('providers')
-          .select('id, name, phone, specialty, department, municipality, is_active')
+          .select('id, user_id, phone, specialty, department, municipality, is_active')
           .eq('department', property.department)
           .eq('municipality', property.municipality)
           .eq('specialty', category)
@@ -121,7 +121,25 @@ export async function POST(request: Request) {
 
         if (providers && providers.length > 0) {
           const provider = providers[0] as any;
-          providerLabel = provider.name || 'Proveedor';
+
+          let providerName = 'Proveedor';
+          if (provider.user_id) {
+            try {
+              const { data: userProfile } = await supabase
+                .from('users_profiles')
+                .select('name')
+                .eq('user_id', provider.user_id)
+                .maybeSingle();
+              
+              if (userProfile?.name) {
+                providerName = userProfile.name;
+              }
+            } catch (nameErr) {
+              console.warn('⚠️ Could not fetch provider name:', nameErr);
+            }
+          }
+
+          providerLabel = providerName;
           
           // Asignar el proveedor al ticket
           if (provider.id) {
