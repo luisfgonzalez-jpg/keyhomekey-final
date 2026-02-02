@@ -129,7 +129,7 @@ export async function POST(request: Request) {
                 .from('users_profiles')
                 .select('name')
                 .eq('user_id', provider.user_id)
-                .single();
+                .maybeSingle();
               
               if (userProfile?.name) {
                 providerName = userProfile.name;
