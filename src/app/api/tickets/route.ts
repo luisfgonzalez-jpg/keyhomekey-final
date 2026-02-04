@@ -1,8 +1,7 @@
 // /app/api/tickets/route.ts
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { searchExternalProviders } from '@/lib/googleProviderSearch';
-import type { ExternalProvider } from '@/type/googleProvider';
+import { EXTERNAL_PROVIDER_ID } from '@/components/ProviderSelector';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -63,12 +62,16 @@ export async function POST(request: Request) {
       category,
       description,
       priority,
+      assigned_provider_id,
+      assigned_provider_name,
+      is_external_provider,
       mediaPaths,
       mediaInfo,
       reported_by_email,
       reporter,
     } = await request.json();
 
+    // Create ticket with assigned provider from the start
     const { data: ticket, error } = await supabase
       .from('tickets')
       .insert([
@@ -81,7 +84,8 @@ export async function POST(request: Request) {
           reporter,
           reported_by_email,
           media_urls: mediaPaths,
-          media_info: mediaInfo, // 👈 IMPORTANTE: guardar info detallada
+          media_info: mediaInfo,
+          assigned_provider_id: assigned_provider_id !== EXTERNAL_PROVIDER_ID ? assigned_provider_id : null,
         },
       ])
       .select()
@@ -89,132 +93,48 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // ---------------------------------------------------------------------
-    // Buscar proveedor interno y externos
-    // ---------------------------------------------------------------------
-    let whatsappNumber = KEYHOME_WHATSAPP;
-    let providerLabel = 'KeyhomeKey';
-    let externalProviders: ExternalProvider[] = [];
-    let providers: any[] | null = null;
-    let assignedProviderId: string | null = null;
+    console.log('✅ Ticket created with ID:', ticket.id);
+    console.log('📋 Provider info:', { 
+      assigned_provider_id, 
+      assigned_provider_name, 
+      is_external_provider 
+    });
 
-    // Obtener propiedad para matching
+    // Get property info for WhatsApp message
     const { data: property } = await supabase
       .from('properties')
       .select('*')
       .eq('id', propertyId)
       .single();
 
-    if (property) {
+    // Determine WhatsApp recipient
+    let whatsappNumber = KEYHOME_WHATSAPP;
+    let providerLabel = assigned_provider_name || 'KeyhomeKey';
+
+    // Send to internal provider if one was selected (not external)
+    if (!is_external_provider && assigned_provider_id && assigned_provider_id !== EXTERNAL_PROVIDER_ID) {
+      // Get phone number for internal provider
       try {
-        console.log('🔍 Buscando proveedor con criterios:', {
-          department: property.department,
-          municipality: property.municipality,
-          category,
-          is_active: true
-        });
-
-        // Buscar proveedor interno en la base de datos
-        const providerResult = await supabase
+        const { data: provider } = await supabase
           .from('providers')
-          .select('id, user_id, phone, specialty, department, municipality, is_active')
-          .eq('department', property.department)
-          .eq('municipality', property.municipality)
-          .eq('specialty', category)
-          .eq('is_active', true)
-          .limit(1);
+          .select('phone')
+          .eq('id', assigned_provider_id)
+          .single();
         
-        console.log('📊 Resultado búsqueda providers:', {
-          found: providerResult.data?.length || 0,
-          error: providerResult.error,
-          data: providerResult.data
-        });
-
-        providers = providerResult.data;
-
-        if (providers && providers.length > 0) {
-          const provider = providers[0] as any;
-
-          let providerName = 'Proveedor';
-          if (provider.user_id) {
-            try {
-              const { data: userProfile } = await supabase
-                .from('profiles')
-                .select('full_name')
-                .eq('id', provider.user_id)
-                .maybeSingle();
-              
-              if (userProfile?.full_name) {
-                providerName = userProfile.full_name;
-              }
-            } catch (nameErr) {
-              console.warn('⚠️ Could not fetch provider name:', nameErr);
-            }
-          }
-
-          providerLabel = providerName;
-          
-          // Asignar el proveedor al ticket
-          if (provider.id) {
-            assignedProviderId = provider.id;
-            try {
-              await supabase
-                .from('tickets')
-                .update({ assigned_provider_id: assignedProviderId })
-                .eq('id', ticket.id);
-              
-              console.log(`✅ Ticket assigned to provider: ${assignedProviderId} (${providerLabel})`);
-            } catch (assignErr) {
-              console.error('⚠️ Could not assign provider to ticket:', assignErr);
-            }
-          }
-          
-          if (provider.phone) {
-            const digits = String(provider.phone).replace(/\D/g, '');
-            whatsappNumber = digits.startsWith('57') ? digits : `57${digits}`;
-          }
-          console.log(`✅ Internal provider found: ${providerLabel}`);
-        } else {
-          console.log('ℹ️ No internal provider found, searching external providers...');
+        if (provider?.phone) {
+          const digits = String(provider.phone).replace(/\D/g, '');
+          whatsappNumber = digits.startsWith('57') ? digits : `57${digits}`;
+          console.log(`✅ Sending WhatsApp to internal provider: ${providerLabel} (${whatsappNumber})`);
         }
-
-        // Buscar proveedores externos via Google (siempre, para tener opciones adicionales)
-        try {
-          externalProviders = await searchExternalProviders({
-            category,
-            location: {
-              department: property.department,
-              municipality: property.municipality,
-            },
-            description,
-          });
-
-          // Guardar proveedores externos en el ticket como metadata
-          if (externalProviders.length > 0) {
-            try {
-              await supabase
-                .from('tickets')
-                .update({
-                  external_providers: externalProviders,
-                })
-                .eq('id', ticket.id);
-              
-              console.log(`✅ Stored ${externalProviders.length} external providers in ticket metadata`);
-            } catch (updateErr) {
-              console.warn('⚠️ Could not store external providers in database. Column may not exist.', updateErr);
-            }
-          }
-        } catch (extErr) {
-          console.error('Error searching external providers:', extErr);
-        }
-      } catch (err) {
-        console.error('Error finding provider:', err);
+      } catch (providerErr) {
+        console.warn('⚠️ Could not fetch provider phone, using KeyhomeKey number:', providerErr);
       }
+    } else if (is_external_provider) {
+      console.log('ℹ️ External provider selected, sending notification to KeyhomeKey');
+      providerLabel = assigned_provider_name || 'Proveedor Externo';
     }
 
-    // ---------------------------------------------------------------------
-    // Enviar notificación por WhatsApp con texto + adjuntos (si existen)
-    // ---------------------------------------------------------------------
+    // Send WhatsApp notification
     try {
       const normalizedTo = normalizePhoneNumber(whatsappNumber);
 
@@ -265,7 +185,7 @@ export async function POST(request: Request) {
         });
       }
 
-      // Texto
+      // Send text message
       await sendWhatsAppMessage({
         messaging_product: 'whatsapp',
         to: normalizedTo,
@@ -273,7 +193,7 @@ export async function POST(request: Request) {
         text: { body: message },
       });
 
-      // Media
+      // Send media attachments
       for (const media of mediaPayload) {
         const basePayload: Record<string, any> = {
           messaging_product: 'whatsapp',
@@ -291,25 +211,24 @@ export async function POST(request: Request) {
 
         await sendWhatsAppMessage(basePayload);
       }
+
+      console.log('✅ WhatsApp notification sent successfully');
     } catch (notifyError) {
-      console.error('No se pudo enviar WhatsApp:', notifyError);
+      console.error('⚠️ Could not send WhatsApp notification:', notifyError);
     }
 
-    // Agregar el nombre del proveedor al ticket antes de retornar
+    // Return ticket with provider name
     const ticketWithProvider = {
       ...ticket,
-      assigned_provider_name: providerLabel !== 'KeyhomeKey' ? providerLabel : null,
+      assigned_provider_name: providerLabel,
     };
 
     return NextResponse.json({ 
       success: true, 
       ticket: ticketWithProvider,
-      assignedProviderId,
-      externalProviders: externalProviders.length > 0 ? externalProviders : undefined,
-      internalProviderFound: providerLabel !== 'KeyhomeKey',
     });
   } catch (error: any) {
-    console.error('Error creating ticket:', error);
+    console.error('❌ Error creating ticket:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

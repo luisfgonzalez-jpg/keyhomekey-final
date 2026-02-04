@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { colombiaLocations } from '@/lib/colombiaData';
 import TicketTimeline from '@/components/TicketTimeline';
+import ProviderSelector from '@/components/ProviderSelector';
 
 import {
   Home,
@@ -919,6 +920,11 @@ export default function HomePage() {
     description: '',
     priority: 'Media',
   });
+
+  // Provider selection states
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [selectedProviderName, setSelectedProviderName] = useState<string>('');
+  const [isExternalProvider, setIsExternalProvider] = useState<boolean>(false);
 
   // ---------------------------------------------------------------------------
   // MEMOIZED VALUES
@@ -2265,6 +2271,9 @@ export default function HomePage() {
                     category: newTicket.category,
                     description: newTicket.description,
                     priority: newTicket.priority,
+                    assigned_provider_id: selectedProviderId,
+                    assigned_provider_name: selectedProviderName,
+                    is_external_provider: isExternalProvider,
                     mediaPaths,
                     mediaInfo,
                     reported_by_email: session.user.email ?? '',
@@ -2287,6 +2296,9 @@ export default function HomePage() {
                   setTickets((prev) => [result.ticket as Ticket, ...prev]);
                   setNewTicket({ propertyId: '', category: 'Plomería', description: '', priority: 'Media' });
                   setTicketFiles([]);
+                  setSelectedProviderId(null);
+                  setSelectedProviderName('');
+                  setIsExternalProvider(false);
                   alert('Ticket creado correctamente.');
                 } catch (err: any) {
                   alert(err.message || 'Error creando el ticket.');
@@ -2349,14 +2361,41 @@ export default function HomePage() {
                   />
                 </div>
 
+                {newTicket.propertyId && (() => {
+                  const selectedProperty = properties.find((p) => p.id === newTicket.propertyId);
+                  return selectedProperty ? (
+                    <ProviderSelector
+                      category={newTicket.category}
+                      department={selectedProperty.department}
+                      municipality={selectedProperty.municipality}
+                      onProviderSelect={(providerId, providerName, isExternal) => {
+                        setSelectedProviderId(providerId);
+                        setSelectedProviderName(providerName);
+                        setIsExternalProvider(isExternal);
+                      }}
+                      selectedProviderId={selectedProviderId}
+                    />
+                  ) : null;
+                })()}
+
                 <FileUploader files={ticketFiles} setFiles={setTicketFiles} />
 
-                <Button disabled={loading} type="submit" className="w-full mt-2 gap-2">
+                <Button 
+                  disabled={loading || !selectedProviderId} 
+                  type="submit" 
+                  className="w-full mt-2 gap-2"
+                >
                   {loading ? 'Creando ticket...' : <><Send size={16} />Crear ticket y notificar</>}
                 </Button>
 
+                {!selectedProviderId && newTicket.propertyId && (
+                  <p className="text-[10px] text-[#F59E0B] mt-1">
+                    ⚠️ Debes seleccionar un proveedor para crear el ticket
+                  </p>
+                )}
+
                 <p className="text-[11px] text-slate-400 mt-2">
-                  Se enviará una notificación por WhatsApp al centro de KeyhomeKey y luego al proveedor adecuado.
+                  Se enviará una notificación por WhatsApp al proveedor seleccionado.
                 </p>
               </form>
             </Card>
