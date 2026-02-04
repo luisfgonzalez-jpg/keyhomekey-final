@@ -42,6 +42,9 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   const [externalSearching, setExternalSearching] = useState(false);
   const [externalProviders, setExternalProviders] = useState<ExternalProvider[]>([]);
   const [selectedExternalProvider, setSelectedExternalProvider] = useState<ExternalProvider | null>(null);
+  
+  // Use a ref to track previous filter values to prevent unnecessary resets
+  // Initialize with empty strings to ensure first render with valid filters triggers proper initialization
   const prevFiltersRef = useRef({ category: '', department: '', municipality: '' });
 
   // Fetch internal providers when category or location changes
@@ -113,6 +116,12 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
 
   // Handle external provider search
   const handleExternalSearch = async () => {
+    // Validate inputs before making the API call
+    if (!category || !department || !municipality) {
+      setError('Por favor selecciona una categoría y ubicación válidas antes de buscar.');
+      return;
+    }
+
     setExternalSearching(true);
     setError(null);
     
@@ -298,56 +307,60 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               <p className="text-xs text-[#64748B] mb-2">
                 Selecciona un proveedor de los resultados:
               </p>
-              {externalProviders.map((provider, index) => (
-                <div
-                  key={index}
-                  onClick={() => handleExternalProviderSelect(provider)}
-                  className={`
-                    relative p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md
-                    ${
-                      selectedExternalProvider?.url === provider.url
-                        ? 'border-[#2563EB] bg-[#EFF6FF]'
-                        : 'border-[#E2E8F0] bg-white hover:border-[#94A3B8]'
-                    }
-                  `}
-                >
-                  {selectedExternalProvider?.url === provider.url && (
-                    <div className="absolute top-3 right-3">
-                      <CheckCircle className="text-[#2563EB]" size={20} />
-                    </div>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-[#1E293B] pr-8">
-                      {provider.name}
-                    </h4>
-                    
-                    <p className="text-xs text-[#64748B] line-clamp-2">
-                      {provider.description}
-                    </p>
-                    
-                    {provider.location && (
-                      <div className="flex items-center gap-2 text-xs text-[#64748B]">
-                        <MapPin size={14} />
-                        <span>{provider.location}</span>
+              {externalProviders.map((provider) => {
+                const isSelected = selectedExternalProvider?.url === provider.url;
+                
+                return (
+                  <div
+                    key={provider.url}
+                    onClick={() => handleExternalProviderSelect(provider)}
+                    className={`
+                      relative p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md
+                      ${
+                        isSelected
+                          ? 'border-[#2563EB] bg-[#EFF6FF]'
+                          : 'border-[#E2E8F0] bg-white hover:border-[#94A3B8]'
+                      }
+                    `}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-3 right-3">
+                        <CheckCircle className="text-[#2563EB]" size={20} />
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-2 text-xs text-[#2563EB]">
-                      <ExternalLink size={14} />
-                      <a 
-                        href={provider.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="hover:underline"
-                      >
-                        Ver sitio web
-                      </a>
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-semibold text-[#1E293B] pr-8">
+                        {provider.name}
+                      </h4>
+                      
+                      <p className="text-xs text-[#64748B] line-clamp-2">
+                        {provider.description}
+                      </p>
+                      
+                      {provider.location && (
+                        <div className="flex items-center gap-2 text-xs text-[#64748B]">
+                          <MapPin size={14} />
+                          <span>{provider.location}</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center gap-2 text-xs text-[#2563EB]">
+                        <ExternalLink size={14} />
+                        <a 
+                          href={provider.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:underline"
+                        >
+                          Ver sitio web
+                        </a>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
