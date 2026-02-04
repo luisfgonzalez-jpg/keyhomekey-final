@@ -86,6 +86,7 @@ export async function POST(request: Request) {
           media_urls: mediaPaths,
           media_info: mediaInfo,
           assigned_provider_id: assigned_provider_id !== EXTERNAL_PROVIDER_ID ? assigned_provider_id : null,
+          assigned_provider_name,
         },
       ])
       .select()

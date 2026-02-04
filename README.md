@@ -76,6 +76,14 @@ KeyHomeKey uses [Resend](https://resend.com) for sending transactional emails.
 - `RETEL_API_KEY` - Your Retel AI API key for external provider matching
 - `RETEL_API_URL` - (Optional) Custom Retel AI API URL. Defaults to `https://api.retel.ai/v1/providers/search`
 
+### Optional for Google Custom Search (External Provider Search)
+
+- `GOOGLE_CUSTOM_SEARCH_API_KEY` - Your Google Custom Search API key for finding external providers
+- `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` - Your Google Custom Search Engine ID (CX)
+- `GOOGLE_SEARCH_DEBUG` - (Optional) Enable debug logging for development (set to `true`)
+
+**Note**: Google Custom Search is optional. Without it, external provider search will show "API not configured" but the app will work normally with internal providers. See [GOOGLE_SEARCH_SETUP.md](./GOOGLE_SEARCH_SETUP.md) for detailed setup instructions.
+
 ### Required for WhatsApp Business Integration
 
 - `WHATSAPP_TOKEN` - Your WhatsApp Business API access token
@@ -98,6 +106,10 @@ WHATSAPP_TOKEN=your-whatsapp-token
 WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=your-verify-token
 INTERNAL_API_KEY=your-internal-api-key
+
+# Google Custom Search (optional - for external provider search)
+GOOGLE_CUSTOM_SEARCH_API_KEY=your-google-api-key
+GOOGLE_CUSTOM_SEARCH_ENGINE_ID=your-search-engine-id
 ```
 
 You can use the `.env.example` file as a template.
@@ -368,10 +380,14 @@ When deploying to Vercel, add the following environment variables in your projec
 7. `WHATSAPP_PHONE_NUMBER_ID`
 8. `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
 9. `INTERNAL_API_KEY`
+10. `GOOGLE_CUSTOM_SEARCH_API_KEY` (Optional - for external provider search)
+11. `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` (Optional - for external provider search)
 
 **Important for WhatsApp Integration on Vercel:**
 - After deployment, update your webhook URL in the Meta Developer Console to point to your Vercel domain
 - Example: `https://your-app.vercel.app/api/whatsapp/webhook`
 - Re-verify the webhook with Meta
+
+**Note**: Google Custom Search variables are optional. See [GOOGLE_SEARCH_SETUP.md](./GOOGLE_SEARCH_SETUP.md) for setup instructions.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
