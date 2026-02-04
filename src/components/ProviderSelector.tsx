@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { MapPin, Phone, Wrench, CheckCircle, Search, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { MapPin, Phone, Wrench, CheckCircle, Search, Loader2, ExternalLink } from 'lucide-react';
+import { searchExternalProviders } from '@/lib/googleProviderSearch';
+import type { ExternalProvider } from '@/type/googleProvider';
 
 // Constant for external provider identifier
 export const EXTERNAL_PROVIDER_ID = 'external';
@@ -38,6 +40,12 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [externalSearching, setExternalSearching] = useState(false);
+  const [externalProviders, setExternalProviders] = useState<ExternalProvider[]>([]);
+  const [selectedExternalProvider, setSelectedExternalProvider] = useState<ExternalProvider | null>(null);
+  
+  // Track previous filter values to detect when they actually change
+  // Initialized with empty strings so the first render with real values will trigger provider fetch
+  const prevFiltersRef = useRef({ category: '', department: '', municipality: '' });
 
   // Fetch internal providers when category or location changes
   useEffect(() => {
@@ -45,9 +53,23 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       return;
     }
 
-    // Reset selection when filters change
-    onProviderSelect(null, '', false);
-    setExternalSearching(false);
+    // Only reset selection when filters actually change
+    const prevFilters = prevFiltersRef.current;
+    const filtersChanged = 
+      prevFilters.category !== category ||
+      prevFilters.department !== department ||
+      prevFilters.municipality !== municipality;
+
+    if (filtersChanged) {
+      // Reset selection when filters change
+      onProviderSelect(null, '', false);
+      setExternalSearching(false);
+      setExternalProviders([]);
+      setSelectedExternalProvider(null);
+
+      // Update previous filters
+      prevFiltersRef.current = { category, department, municipality };
+    }
 
     const fetchInternalProviders = async () => {
       try {
@@ -77,7 +99,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
     };
 
     fetchInternalProviders();
-  }, [category, department, municipality, onProviderSelect]);
+  }, [category, department, municipality]);
 
   // Handle provider type change
   const handleProviderTypeChange = (type: ProviderType) => {
@@ -93,11 +115,42 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   };
 
   // Handle external provider search
-  const handleExternalSearch = () => {
+  const handleExternalSearch = async () => {
+    // Validate inputs before making the API call
+    if (!category || !department || !municipality) {
+      setError('Por favor selecciona una categoría y ubicación válidas antes de buscar.');
+      return;
+    }
+
     setExternalSearching(true);
-    // Trigger external provider search logic
-    // For now, we'll allow the user to proceed with external provider selection
-    onProviderSelect(EXTERNAL_PROVIDER_ID, 'Proveedor Externo (Google)', true);
+    setError(null);
+    
+    try {
+      const providers = await searchExternalProviders({
+        category,
+        location: {
+          department,
+          municipality,
+        },
+      });
+
+      setExternalProviders(providers);
+      
+      if (providers.length === 0) {
+        setError('No se encontraron proveedores externos. Intenta con una categoría diferente.');
+      }
+    } catch (err: unknown) {
+      console.error('Error searching external providers:', err);
+      setError(err instanceof Error ? err.message : 'Error al buscar proveedores externos');
+    } finally {
+      setExternalSearching(false);
+    }
+  };
+
+  // Handle external provider selection
+  const handleExternalProviderSelect = (provider: ExternalProvider) => {
+    setSelectedExternalProvider(provider);
+    onProviderSelect(EXTERNAL_PROVIDER_ID, provider.name, true);
   };
 
   return (
@@ -210,7 +263,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         <div className="space-y-3">
           <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl">
             <p className="text-xs text-[#64748B] mb-3">
-              Se buscará un proveedor externo usando Google Places para la categoría{' '}
+              Busca proveedores externos usando Google para la categoría{' '}
               <span className="font-semibold">{category}</span> en{' '}
               <span className="font-semibold">{municipality}, {department}</span>.
             </p>
@@ -242,12 +295,72 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
               )}
             </button>
           </div>
+
+          {error && (
+            <div className="p-3 bg-[#FEE2E2] border border-[#EF4444] rounded-xl">
+              <p className="text-xs text-[#DC2626]">{error}</p>
+            </div>
+          )}
           
-          {externalSearching && (
-            <div className="p-3 bg-[#D1FAE5] border border-[#34D399] rounded-xl">
-              <p className="text-xs text-[#065F46]">
-                ✓ Se buscará un proveedor externo al crear el ticket
+          {externalProviders.length > 0 && (
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              <p className="text-xs text-[#64748B] mb-2">
+                Selecciona un proveedor de los resultados:
               </p>
+              {externalProviders.map((provider) => {
+                const isSelected = selectedExternalProvider?.url === provider.url;
+                
+                return (
+                  <div
+                    key={provider.url}
+                    onClick={() => handleExternalProviderSelect(provider)}
+                    className={`
+                      relative p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md
+                      ${
+                        isSelected
+                          ? 'border-[#2563EB] bg-[#EFF6FF]'
+                          : 'border-[#E2E8F0] bg-white hover:border-[#94A3B8]'
+                      }
+                    `}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-3 right-3">
+                        <CheckCircle className="text-[#2563EB]" size={20} />
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-semibold text-[#1E293B] pr-8">
+                        {provider.name}
+                      </h4>
+                      
+                      <p className="text-xs text-[#64748B] line-clamp-2">
+                        {provider.description}
+                      </p>
+                      
+                      {provider.location && (
+                        <div className="flex items-center gap-2 text-xs text-[#64748B]">
+                          <MapPin size={14} />
+                          <span>{provider.location}</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center gap-2 text-xs text-[#2563EB]">
+                        <ExternalLink size={14} />
+                        <a 
+                          href={provider.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:underline"
+                        >
+                          Ver sitio web
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
