@@ -62,14 +62,14 @@ Add these variables to your `.env.local` file:
 
 ```bash
 # Google Custom Search (optional - for external provider search)
-GOOGLE_CUSTOM_SEARCH_API_KEY=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY
-GOOGLE_CUSTOM_SEARCH_ENGINE_ID=a1b2c3d4e5f6g7h8i:j9k0l1m2n3o
+GOOGLE_CUSTOM_SEARCH_API_KEY=your-google-api-key-here
+GOOGLE_CUSTOM_SEARCH_ENGINE_ID=your-search-engine-id-here
 
 # Optional: Enable debug logging (shows detailed search queries and results)
 GOOGLE_SEARCH_DEBUG=true
 ```
 
-**Note**: The API key above is an example. Use your actual API key from Google Cloud Console.
+**Note**: Replace the placeholder values above with your actual credentials from Google Cloud Console.
 
 #### For Vercel Deployment
 
