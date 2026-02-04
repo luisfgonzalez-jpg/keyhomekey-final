@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Phone, Wrench, CheckCircle, Search, Loader2 } from 'lucide-react';
 
+// Constant for external provider identifier
+export const EXTERNAL_PROVIDER_ID = 'external';
+
 interface Provider {
   id: string;
   user_id: string;
@@ -42,6 +45,10 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       return;
     }
 
+    // Reset selection when filters change
+    onProviderSelect(null, '', false);
+    setExternalSearching(false);
+
     const fetchInternalProviders = async () => {
       try {
         setLoading(true);
@@ -70,11 +77,12 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
     };
 
     fetchInternalProviders();
-  }, [category, department, municipality]);
+  }, [category, department, municipality, onProviderSelect]);
 
   // Handle provider type change
   const handleProviderTypeChange = (type: ProviderType) => {
     setProviderType(type);
+    setExternalSearching(false);
     // Reset selection when switching types
     onProviderSelect(null, '', type === 'external');
   };
@@ -89,7 +97,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
     setExternalSearching(true);
     // Trigger external provider search logic
     // For now, we'll allow the user to proceed with external provider selection
-    onProviderSelect('external', 'Proveedor Externo (Google)', true);
+    onProviderSelect(EXTERNAL_PROVIDER_ID, 'Proveedor Externo (Google)', true);
   };
 
   return (

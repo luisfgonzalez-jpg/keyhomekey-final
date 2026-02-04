@@ -1,6 +1,7 @@
 // /app/api/tickets/route.ts
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { EXTERNAL_PROVIDER_ID } from '@/components/ProviderSelector';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
           reported_by_email,
           media_urls: mediaPaths,
           media_info: mediaInfo,
-          assigned_provider_id: assigned_provider_id !== 'external' ? assigned_provider_id : null,
+          assigned_provider_id: assigned_provider_id !== EXTERNAL_PROVIDER_ID ? assigned_provider_id : null,
         },
       ])
       .select()
@@ -110,7 +111,8 @@ export async function POST(request: Request) {
     let whatsappNumber = KEYHOME_WHATSAPP;
     let providerLabel = assigned_provider_name || 'KeyhomeKey';
 
-    if (assigned_provider_id && assigned_provider_id !== 'external' && !is_external_provider) {
+    // Send to internal provider if one was selected (not external)
+    if (!is_external_provider && assigned_provider_id && assigned_provider_id !== EXTERNAL_PROVIDER_ID) {
       // Get phone number for internal provider
       try {
         const { data: provider } = await supabase
