@@ -1222,17 +1222,17 @@ export default function HomePage() {
                 .maybeSingle();
 
               if (provider?.user_id) {
-                // Obtener nombre del proveedor desde profiles
-                const { data: profile } = await supabase
-                  .from('profiles')
-                  .select('full_name')
-                  .eq('id', provider.user_id)
+                // Obtener nombre del proveedor desde users_profiles
+                const { data: userProfile } = await supabase
+                  .from('users_profiles')
+                  .select('name')
+                  .eq('user_id', provider.user_id)
                   .maybeSingle();
 
-                if (profile?.full_name) {
+                if (userProfile?.name) {
                   return {
                     ...ticket,
-                    assigned_provider_name: profile.full_name,
+                    assigned_provider_name: userProfile.name,
                   };
                 }
               }
