@@ -43,8 +43,8 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   const [externalProviders, setExternalProviders] = useState<ExternalProvider[]>([]);
   const [selectedExternalProvider, setSelectedExternalProvider] = useState<ExternalProvider | null>(null);
   
-  // Use a ref to track previous filter values to prevent unnecessary resets
-  // Initialize with empty strings to ensure first render with valid filters triggers proper initialization
+  // Track previous filter values to detect when they actually change
+  // Initialized with empty strings so the first render with real values will trigger provider fetch
   const prevFiltersRef = useRef({ category: '', department: '', municipality: '' });
 
   // Fetch internal providers when category or location changes
