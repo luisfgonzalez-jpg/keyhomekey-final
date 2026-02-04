@@ -61,21 +61,21 @@ export async function GET(request: Request) {
       });
     }
 
-    // Fetch full names from profiles table
+    // Fetch full names from users_profiles table
     const providersWithNames = await Promise.all(
       providers.map(async (provider) => {
         let full_name = 'Proveedor';
         
         if (provider.user_id) {
           try {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', provider.user_id)
+            const { data: userProfile } = await supabase
+              .from('users_profiles')
+              .select('name')
+              .eq('user_id', provider.user_id)
               .maybeSingle();
             
-            if (profile?.full_name) {
-              full_name = profile.full_name;
+            if (userProfile?.name) {
+              full_name = userProfile.name;
             }
           } catch (err) {
             console.warn('⚠️ Could not fetch profile for provider:', provider.id, err);
