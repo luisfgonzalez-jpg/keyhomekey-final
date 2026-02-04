@@ -15,7 +15,6 @@ interface Provider {
 
 interface ProviderSelectorProps {
   category: string;
-  propertyId: string;
   department: string;
   municipality: string;
   onProviderSelect: (providerId: string | null, providerName: string, isExternal: boolean) => void;
@@ -26,7 +25,6 @@ type ProviderType = 'internal' | 'external';
 
 const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   category,
-  propertyId,
   department,
   municipality,
   onProviderSelect,
@@ -63,9 +61,9 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
         }
 
         setInternalProviders(data.providers || []);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching providers:', err);
-        setError(err.message || 'Error al cargar proveedores');
+        setError(err instanceof Error ? err.message : 'Error al cargar proveedores');
       } finally {
         setLoading(false);
       }
@@ -147,7 +145,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                 No hay proveedores internos disponibles para esta categoría y ubicación.
               </p>
               <p className="text-xs text-[#64748B] mt-2">
-                Puedes seleccionar "Proveedores Externos" para buscar en Google.
+                Puedes seleccionar &quot;Proveedores Externos&quot; para buscar en Google.
               </p>
             </div>
           )}

@@ -2366,7 +2366,6 @@ export default function HomePage() {
                   return selectedProperty ? (
                     <ProviderSelector
                       category={newTicket.category}
-                      propertyId={newTicket.propertyId}
                       department={selectedProperty.department}
                       municipality={selectedProperty.municipality}
                       onProviderSelect={(providerId, providerName, isExternal) => {
