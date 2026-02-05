@@ -5,6 +5,9 @@ import { createClient } from '@/utils/supabase/client';
 import { colombiaLocations } from '@/lib/colombiaData';
 import { User, Plus, Trash2, Edit2, Save, X, Phone, MapPin, Wrench } from 'lucide-react';
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
 interface Provider {
   id: string;
   user_id: string;
@@ -25,14 +28,28 @@ interface UserProfile {
   role: string;
 }
 
-const SPECIALTIES = ['Plomería', 'Eléctrico', 'Electrodomésticos', 'Cerrajería', 'Otros'];
+const SPECIALTIES = [
+  'Plomería',
+  'Eléctrico',
+  'Carpintería',
+  'Pintura',
+  'Cerrajería',
+  'Jardinería',
+  'Limpieza',
+  'Aire Acondicionado',
+  'Gas',
+  'Albañilería',
+  'Herrería',
+  'Vidriería',
+  'Electrodomésticos',
+  'Otros'
+];
 
 export default function ProvidersPage() {
   const supabase = createClient();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
@@ -47,7 +64,7 @@ export default function ProvidersPage() {
   });
 
   useEffect(() => {
-    checkAdminAndLoadData();
+    loadData();
   }, []);
 
   useEffect(() => {
@@ -63,32 +80,12 @@ export default function ProvidersPage() {
     }
   }, [formData.department]);
 
-  async function checkAdminAndLoadData() {
+  async function loadData() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        window.location.href = '/';
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (profile?.role !== 'ADMIN') {
-        alert('No tienes permisos para acceder a esta página');
-        window.location.href = '/';
-        return;
-      }
-
-      setIsAdmin(true);
       await loadProviders();
       await loadUsers();
     } catch (error) {
-      console.error('Error checking admin:', error);
+      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
@@ -170,20 +167,21 @@ export default function ProvidersPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Estás seguro de eliminar este proveedor?')) return;
+    if (!confirm('¿Estás seguro de desactivar este proveedor?')) return;
 
     try {
+      // Soft delete: set is_active to false
       const { error } = await supabase
         .from('providers')
-        .delete()
+        .update({ is_active: false })
         .eq('id', id);
 
       if (error) throw error;
       
-      alert('Proveedor eliminado');
+      alert('Proveedor desactivado');
       await loadProviders();
     } catch (error: any) {
-      console.error('Error deleting provider:', error);
+      console.error('Error deactivating provider:', error);
       alert(`Error: ${error.message}`);
     }
   }
@@ -216,19 +214,17 @@ export default function ProvidersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      <div className="p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
       </div>
     );
   }
 
-  if (!isAdmin) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="p-6">
+      <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Gestión de Proveedores</h1>
