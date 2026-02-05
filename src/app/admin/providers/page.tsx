@@ -65,6 +65,7 @@ export default function ProvidersPage() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export default function ProvidersPage() {
     } else {
       setAvailableCities([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.department]);
 
   async function loadData() {

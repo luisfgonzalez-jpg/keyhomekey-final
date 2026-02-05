@@ -57,10 +57,12 @@ export default function AdminTicketsPage() {
 
   useEffect(() => {
     loadTickets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets, statusFilter, categoryFilter, priorityFilter, searchQuery]);
 
   async function loadTickets() {

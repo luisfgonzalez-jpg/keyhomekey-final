@@ -23,7 +23,12 @@ interface TicketDetail {
   assigned_provider_id?: string;
   assigned_provider_name?: string;
   media_urls?: string[];
-  media_info?: any[];
+  media_info?: Array<{
+    url: string;
+    name: string;
+    type: string;
+    size: number;
+  }>;
   property: {
     id: string;
     address: string;
@@ -48,6 +53,7 @@ export default function AdminTicketDetailPage() {
     if (ticketId) {
       loadTicket();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
 
   async function loadTicket() {
