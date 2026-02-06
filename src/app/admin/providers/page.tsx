@@ -24,7 +24,7 @@ interface Provider {
 interface UserProfile {
   id: string;
   email: string;
-  full_name: string;
+  name: string;
   role: string;
 }
 
@@ -131,11 +131,11 @@ export default function ProvidersPage() {
       .eq('role', 'PROVIDER')
       .order('name');
 
-    // Map to match the interface structure
+    // Map user_id to id for consistency with interface
     const mappedUsers = (data || []).map(user => ({
       id: user.user_id,
       email: user.email,
-      full_name: user.name,
+      name: user.name,
       role: user.role
     }));
 
@@ -271,7 +271,7 @@ export default function ProvidersPage() {
                   <option value="">Selecciona un usuario</option>
                   {users.map((user) => (
                     <option key={user.id} value={user.id}>
-                      {user.full_name} ({user.email})
+                      {user.name} ({user.email})
                     </option>
                   ))}
                 </select>
