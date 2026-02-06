@@ -24,7 +24,7 @@ interface Provider {
 interface UserProfile {
   id: string;
   email: string;
-  full_name: string;
+  name: string;
   role: string;
 }
 
@@ -104,19 +104,19 @@ export default function ProvidersPage() {
       return;
     }
 
-    // Enrich with user data
+    // Enrich with user data from users_profiles
     const enrichedProviders = await Promise.all(
       (data || []).map(async (provider) => {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, email')
-          .eq('id', provider.user_id)
+        const { data: userProfile } = await supabase
+          .from('users_profiles')
+          .select('name, email')
+          .eq('user_id', provider.user_id)
           .maybeSingle();
 
         return {
           ...provider,
-          user_name: profile?.full_name || 'N/A',
-          user_email: profile?.email || 'N/A',
+          user_name: userProfile?.name || 'Sin nombre',
+          user_email: userProfile?.email || 'Sin email',
         };
       })
     );
@@ -126,12 +126,20 @@ export default function ProvidersPage() {
 
   async function loadUsers() {
     const { data } = await supabase
-      .from('profiles')
-      .select('id, email, full_name, role')
+      .from('users_profiles')
+      .select('user_id, email, name, role')
       .eq('role', 'PROVIDER')
-      .order('full_name');
+      .order('name');
 
-    setUsers(data || []);
+    // Map user_id to id for consistency with interface
+    const mappedUsers = (data || []).map(user => ({
+      id: user.user_id,
+      email: user.email,
+      name: user.name,
+      role: user.role
+    }));
+
+    setUsers(mappedUsers);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -263,7 +271,7 @@ export default function ProvidersPage() {
                   <option value="">Selecciona un usuario</option>
                   {users.map((user) => (
                     <option key={user.id} value={user.id}>
-                      {user.full_name} ({user.email})
+                      {user.name} ({user.email})
                     </option>
                   ))}
                 </select>

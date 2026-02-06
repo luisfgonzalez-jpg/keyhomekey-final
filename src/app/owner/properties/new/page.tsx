@@ -311,11 +311,11 @@ export default function NewPropertyPage() {
             console.log('📧 Sending welcome email to tenant');
           }
 
-          // Get owner profile for full name
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', user.id)
+          // Get owner profile for name
+          const { data: userProfile, error: profileError } = await supabase
+            .from('users_profiles')
+            .select('name')
+            .eq('user_id', user.id)
             .single();
 
           if (profileError) {
@@ -335,7 +335,7 @@ export default function NewPropertyPage() {
                 propertyType: propertyType,
                 city: city,
                 department: department,
-                ownerName: profile?.full_name || 'Tu propietario',
+                ownerName: userProfile?.name || 'Tu propietario',
                 ownerPhone: ownerPhone,
                 contractStart: contractStart || 'No especificado',
                 contractEnd: contractEnd || 'No especificado',
