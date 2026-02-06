@@ -43,13 +43,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
-      const { data: profile } = await supabase
-        .from('profiles')
+      const { data: userProfile } = await supabase
+        .from('users_profiles')
         .select('role')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
-      if (profile?.role !== 'ADMIN') {
+      if (userProfile?.role !== 'ADMIN') {
         alert('No tienes permisos para acceder al panel de administración');
         router.push('/');
         return;
