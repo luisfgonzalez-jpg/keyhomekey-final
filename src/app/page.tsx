@@ -1154,6 +1154,12 @@ export default function HomePage() {
         }
       }
 
+      // Redirect ADMIN users to dedicated admin panel
+      if (role === 'ADMIN') {
+        router.push('/admin');
+        return;
+      }
+
       setUserRole(role);
       setView('dashboard');
       await fetchData(role, user);
