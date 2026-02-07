@@ -1127,7 +1127,7 @@ export default function HomePage() {
 
       let role: Role = null;
 
-      if (profile?.role && ['OWNER', 'TENANT', 'PROVIDER'].includes(profile.role)) {
+      if (profile?.role && ['OWNER', 'TENANT', 'PROVIDER', 'ADMIN'].includes(profile.role)) {
         role = profile.role as Role;
       }
 
@@ -1686,6 +1686,7 @@ export default function HomePage() {
     if (role === 'OWNER') return 'Propietario';
     if (role === 'TENANT') return 'Inquilino';
     if (role === 'PROVIDER') return 'Proveedor';
+    if (role === 'ADMIN') return 'Administrador';
     return 'Usuario';
   };
 
