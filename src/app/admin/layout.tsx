@@ -35,33 +35,53 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, []);
 
   async function checkAdminAccess() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        router.push('/');
-        return;
+    const maxRetries = 3;
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          // User found, proceed with role check
+          const { data: userProfile } = await supabase
+            .from('users_profiles')
+            .select('role')
+            .eq('user_id', user.id)
+            .single();
+
+          if (userProfile?.role !== 'ADMIN') {
+            alert('No tienes permisos para acceder al panel de administración');
+            router.push('/');
+            return;
+          }
+
+          setIsAdmin(true);
+          setLoading(false);
+          return; // Success!
+        }
+        
+        // User not found, retry with exponential backoff
+        retryCount++;
+        if (retryCount < maxRetries) {
+          const delay = 300 * retryCount; // 300ms, 600ms, 900ms
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } catch (error) {
+        console.error('Error checking admin access:', error);
+        retryCount++;
+        
+        if (retryCount < maxRetries) {
+          const delay = 300 * retryCount;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-
-      const { data: userProfile } = await supabase
-        .from('users_profiles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-
-      if (userProfile?.role !== 'ADMIN') {
-        alert('No tienes permisos para acceder al panel de administración');
-        router.push('/');
-        return;
-      }
-
-      setIsAdmin(true);
-    } catch (error) {
-      console.error('Error checking admin access:', error);
-      router.push('/');
-    } finally {
-      setLoading(false);
     }
+    
+    // After all retries failed, redirect to home
+    console.log('Admin access check failed after retries, redirecting to home');
+    router.push('/');
+    setLoading(false);
   }
 
   async function handleLogout() {
