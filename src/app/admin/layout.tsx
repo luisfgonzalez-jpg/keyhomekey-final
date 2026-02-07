@@ -61,10 +61,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return; // Success!
         }
         
-        // User not found, retry with exponential backoff
+        // User not found, retry with increasing delay
         retryCount++;
         if (retryCount < maxRetries) {
-          const delay = 300 * retryCount; // 300ms, 600ms, 900ms
+          // Linear backoff: 300ms (1st), 600ms (2nd), total up to 900ms cumulative
+          const delay = 300 * retryCount;
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       } catch (error) {
@@ -72,6 +73,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         retryCount++;
         
         if (retryCount < maxRetries) {
+          // Linear backoff: 300ms (1st), 600ms (2nd), total up to 900ms cumulative
           const delay = 300 * retryCount;
           await new Promise(resolve => setTimeout(resolve, delay));
         }
