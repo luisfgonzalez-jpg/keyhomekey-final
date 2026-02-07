@@ -1101,7 +1101,19 @@ export default function HomePage() {
         setAuthMode('signin');
         setPassword('');
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const normalizedEmail = email.trim().toLowerCase();
+
+        // Force cleanup of any stale sessions before login
+        await supabase.auth.signOut();
+        
+        // Small delay to ensure cleanup completes
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Now perform fresh login
+        const { data, error } = await supabase.auth.signInWithPassword({ 
+          email: normalizedEmail, 
+          password 
+        });
         if (error) throw error;
         if (!data.session) throw new Error('No se pudo iniciar sesión.');
 
@@ -1158,10 +1170,7 @@ export default function HomePage() {
       if (role === 'ADMIN') {
         setUserRole(role);
         
-        // Wait for session to persist to storage
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Now redirect to admin panel
+        // Direct redirect (session is now clean and fresh)
         router.push('/admin');
         return;
       }
