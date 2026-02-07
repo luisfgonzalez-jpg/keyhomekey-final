@@ -1156,6 +1156,12 @@ export default function HomePage() {
 
       // Redirect ADMIN users to dedicated admin panel
       if (role === 'ADMIN') {
+        setUserRole(role);
+        
+        // Wait for session to persist to storage
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Now redirect to admin panel
         router.push('/admin');
         return;
       }
