@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/utils/supabase/client';
 import { colombiaLocations } from '@/lib/colombiaData';
 import TicketTimeline from '@/components/TicketTimeline';
 import ProviderSelector from '@/components/ProviderSelector';
@@ -456,6 +456,7 @@ const MediaViewer = ({
   mediaUrls?: string[];
   mediaInfo?: MediaInfo[];
 }) => {
+  const supabase = useMemo(() => createClient(), []);
   const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
   const [selectedMediaType, setSelectedMediaType] = useState<string | null>(null);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
@@ -491,7 +492,7 @@ const MediaViewer = ({
     };
     
     fetchSignedUrls();
-  }, [mediaUrls]);
+  }, [mediaUrls, supabase]);
 
   if (!mediaUrls || mediaUrls.length === 0) {
     return (
@@ -825,6 +826,7 @@ const FileUploader = ({
 
 export default function HomePage() {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<Role>(null);
   const [view, setView] = useState<'login' | 'dashboard'>('login');
