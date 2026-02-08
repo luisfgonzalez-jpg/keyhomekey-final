@@ -492,7 +492,7 @@ const MediaViewer = ({
     };
     
     fetchSignedUrls();
-  }, [mediaUrls]);
+  }, [mediaUrls, supabase]);
 
   if (!mediaUrls || mediaUrls.length === 0) {
     return (
