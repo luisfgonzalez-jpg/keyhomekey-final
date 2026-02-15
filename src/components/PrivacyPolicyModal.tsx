@@ -34,7 +34,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onAccept }) => 
                 <h3 className="text-base font-bold text-[#1E293B]">1. Introducción</h3>
               </div>
               <p className="text-[#64748B]">
-                KeyHomeKey, en adelante "la Plataforma", es responsable del tratamiento de los datos personales
+                KeyHomeKey, en adelante &ldquo;la Plataforma&rdquo;, es responsable del tratamiento de los datos personales
                 que usted nos proporciona. Nos comprometemos a proteger su privacidad y a cumplir con la Ley 1581
                 de 2012 de Colombia sobre Protección de Datos Personales y las demás normas aplicables, incluyendo
                 los principios del Reglamento General de Protección de Datos (GDPR).
@@ -152,7 +152,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onAccept }) => 
             <section>
               <h3 className="text-base font-bold text-[#1E293B] mb-2">9. Aceptación de la Política</h3>
               <p className="text-[#64748B]">
-                Al hacer clic en "Aceptar Políticas", usted reconoce que ha leído, comprendido y acepta estas
+                Al hacer clic en &ldquo;Aceptar Políticas&rdquo;, usted reconoce que ha leído, comprendido y acepta estas
                 Políticas de Tratamiento de Datos Personales. El uso continuado de nuestros servicios constituye
                 su aceptación de cualquier actualización a esta política. Nos reservamos el derecho de modificar
                 estas políticas, notificándole oportunamente de cualquier cambio significativo.
