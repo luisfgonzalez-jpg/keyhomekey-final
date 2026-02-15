@@ -1775,7 +1775,6 @@ export default function HomePage() {
                   checked={acceptedPolicy}
                   onChange={(e) => setAcceptedPolicy(e.target.checked)}
                   className="h-4 w-4 mt-1 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
-                  required
                 />
                 <label htmlFor="privacy-policy" className="text-xs text-[#64748B]">
                   Acepto las{' '}
