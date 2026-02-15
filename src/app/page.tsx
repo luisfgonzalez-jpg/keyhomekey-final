@@ -8,7 +8,6 @@ import { colombiaLocations } from '@/lib/colombiaData';
 import TicketTimeline from '@/components/TicketTimeline';
 import ProviderSelector from '@/components/ProviderSelector';
 import PrivacyPolicyModal from '@/components/PrivacyPolicyModal';
-import { usePrivacyConsent } from '@/hooks/usePrivacyConsent';
 
 import {
   Home,
@@ -829,7 +828,6 @@ const FileUploader = ({
 export default function HomePage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const { hasConsented, isLoading: isLoadingConsent, giveConsent } = usePrivacyConsent();
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<Role>(null);
   const [view, setView] = useState<'login' | 'dashboard'>('login');
@@ -898,6 +896,10 @@ export default function HomePage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+
+  // Privacy policy states
+  const [acceptedPolicy, setAcceptedPolicy] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
 
   // Estado para modal de recuperación de contraseña
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
@@ -1729,14 +1731,6 @@ export default function HomePage() {
   });
 
   // ---------------------------------------------------------------------------
-  // PRIVACY POLICY MODAL - Show before anything else if not consented
-  // ---------------------------------------------------------------------------
-
-  if (!isLoadingConsent && !hasConsented) {
-    return <PrivacyPolicyModal onAccept={giveConsent} />;
-  }
-
-  // ---------------------------------------------------------------------------
   // LOGIN VIEW
   // ---------------------------------------------------------------------------
 
@@ -1772,9 +1766,39 @@ export default function HomePage() {
             )}
             <Input icon={Mail} type="email" placeholder="Email" required value={email} onChange={(e: any) => setEmail(e.target.value)} />
             <Input icon={Lock} type="password" placeholder="Contraseña" required value={password} onChange={(e: any) => setPassword(e.target.value)} />
-            <Button disabled={loading} type="submit" className="w-full mt-2">
+            
+            {authMode === 'signup' && (
+              <div className="flex items-start gap-2 mt-2">
+                <input
+                  id="privacy-policy"
+                  type="checkbox"
+                  checked={acceptedPolicy}
+                  onChange={(e) => setAcceptedPolicy(e.target.checked)}
+                  className="h-4 w-4 mt-1 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
+                  required
+                />
+                <label htmlFor="privacy-policy" className="text-xs text-[#64748B]">
+                  Acepto las{' '}
+                  <button
+                    type="button"
+                    onClick={() => setShowPolicyModal(true)}
+                    className="text-[#2563EB] hover:text-[#1D4ED8] underline"
+                  >
+                    políticas de tratamiento de datos personales
+                  </button>
+                </label>
+              </div>
+            )}
+            
+            <Button disabled={loading || (authMode === 'signup' && !acceptedPolicy)} type="submit" className="w-full mt-2">
               {loading ? 'Procesando...' : authMode === 'signin' ? 'Entrar' : 'Crear cuenta'}
             </Button>
+
+            {authMode === 'signup' && !acceptedPolicy && (
+              <p className="text-xs text-[#F59E0B] text-center mt-2">
+                ⚠️ Debes aceptar las políticas para continuar
+              </p>
+            )}
 
             {authMode === 'signin' && (
               <button
@@ -1860,6 +1884,12 @@ export default function HomePage() {
             </Card>
           </div>
         )}
+
+        {/* MODAL: Políticas de Privacidad */}
+        <PrivacyPolicyModal 
+          isOpen={showPolicyModal}
+          onClose={() => setShowPolicyModal(false)}
+        />
       </div>
     );
   }
