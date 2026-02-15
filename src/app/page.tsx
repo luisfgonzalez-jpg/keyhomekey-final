@@ -7,6 +7,8 @@ import { createClient } from '@/utils/supabase/client';
 import { colombiaLocations } from '@/lib/colombiaData';
 import TicketTimeline from '@/components/TicketTimeline';
 import ProviderSelector from '@/components/ProviderSelector';
+import PrivacyPolicyModal from '@/components/PrivacyPolicyModal';
+import { usePrivacyConsent } from '@/hooks/usePrivacyConsent';
 
 import {
   Home,
@@ -827,6 +829,7 @@ const FileUploader = ({
 export default function HomePage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const { hasConsented, isLoading: isLoadingConsent, giveConsent } = usePrivacyConsent();
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<Role>(null);
   const [view, setView] = useState<'login' | 'dashboard'>('login');
@@ -1724,6 +1727,14 @@ export default function HomePage() {
     
     return matchesSearch && matchesStatus && matchesPriority;
   });
+
+  // ---------------------------------------------------------------------------
+  // PRIVACY POLICY MODAL - Show before anything else if not consented
+  // ---------------------------------------------------------------------------
+
+  if (!isLoadingConsent && !hasConsented) {
+    return <PrivacyPolicyModal onAccept={giveConsent} />;
+  }
 
   // ---------------------------------------------------------------------------
   // LOGIN VIEW
