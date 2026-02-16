@@ -1,31 +1,45 @@
 'use client';
 
 import React from 'react';
-import { Shield, FileText } from 'lucide-react';
+import { Shield, FileText, X } from 'lucide-react';
 
 interface PrivacyPolicyModalProps {
-  onAccept: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onAccept }) => {
+const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="px-6 py-5 border-b border-[#E2E8F0] bg-gradient-to-r from-[#2563EB] to-[#7C3AED] rounded-t-2xl">
-          <div className="flex items-center gap-3 text-white">
-            <div className="p-2 bg-white bg-opacity-20 rounded-xl">
-              <Shield size={24} />
+        <div className="flex items-center justify-between p-6 border-b border-[#E2E8F0]">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#DBEAFE] rounded-xl">
+              <Shield size={24} className="text-[#2563EB]" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold">Políticas de Tratamiento de Datos Personales</h2>
-              <p className="text-sm opacity-90">KeyHomeKey - Protección de tu información</p>
-            </div>
+            <h2 className="text-2xl font-bold text-[#1E293B]">
+              Políticas de Tratamiento de Datos Personales
+            </h2>
           </div>
+          <button
+            onClick={onClose}
+            className="text-[#64748B] hover:text-[#1E293B] transition-colors"
+          >
+            <X size={24} />
+          </button>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 text-[#1E293B]">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-5 text-sm leading-relaxed">
             {/* Introducción */}
             <section>
@@ -168,18 +182,14 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ onAccept }) => 
           </div>
         </div>
 
-        {/* Footer with Accept Button */}
-        <div className="px-6 py-4 border-t border-[#E2E8F0] bg-[#F8FAFC]">
+        {/* Footer with Close Button */}
+        <div className="border-t border-[#E2E8F0] p-6">
           <button
-            onClick={onAccept}
+            onClick={onClose}
             className="w-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] text-white font-bold py-3 px-6 rounded-xl hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
           >
-            <Shield size={20} />
-            Aceptar Políticas
+            Cerrar
           </button>
-          <p className="text-xs text-[#64748B] text-center mt-3">
-            Debes aceptar las políticas para continuar usando KeyHomeKey
-          </p>
         </div>
       </div>
     </div>
