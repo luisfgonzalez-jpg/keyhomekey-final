@@ -8,6 +8,7 @@ import { colombiaLocations } from '@/lib/colombiaData';
 import TicketTimeline from '@/components/TicketTimeline';
 import ProviderSelector from '@/components/ProviderSelector';
 import PrivacyPolicyModal from '@/components/PrivacyPolicyModal';
+import TermsAndConditionsModal from '@/components/TermsAndConditionsModal';
 
 import {
   Home,
@@ -901,6 +902,10 @@ export default function HomePage() {
   const [acceptedPolicy, setAcceptedPolicy] = useState(false);
   const [showPolicyModal, setShowPolicyModal] = useState(false);
 
+  // Terms and conditions states
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+
   // Estado para modal de recuperación de contraseña
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
@@ -1768,34 +1773,60 @@ export default function HomePage() {
             <Input icon={Lock} type="password" placeholder="Contraseña" required value={password} onChange={(e: any) => setPassword(e.target.value)} />
             
             {authMode === 'signup' && (
-              <div className="flex items-start gap-2 mt-2">
-                <input
-                  id="privacy-policy"
-                  type="checkbox"
-                  checked={acceptedPolicy}
-                  onChange={(e) => setAcceptedPolicy(e.target.checked)}
-                  className="h-4 w-4 mt-1 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
-                />
-                <label htmlFor="privacy-policy" className="text-xs text-[#64748B]">
-                  Acepto las{' '}
-                  <button
-                    type="button"
-                    onClick={() => setShowPolicyModal(true)}
-                    className="text-[#2563EB] hover:text-[#1D4ED8] underline"
-                  >
-                    políticas de tratamiento de datos personales
-                  </button>
-                </label>
+              <div className="space-y-3 mt-2">
+                {/* Checkbox de Términos y Condiciones */}
+                <div className="flex items-start gap-2">
+                  <input
+                    id="terms-conditions"
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="h-4 w-4 mt-1 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
+                    required
+                  />
+                  <label htmlFor="terms-conditions" className="text-xs text-[#64748B]">
+                    Acepto los{' '}
+                    <button
+                      type="button"
+                      onClick={() => setShowTermsModal(true)}
+                      className="text-[#2563EB] hover:text-[#1D4ED8] underline font-medium"
+                    >
+                      términos y condiciones
+                    </button>
+                  </label>
+                </div>
+
+                {/* Checkbox de Políticas */}
+                <div className="flex items-start gap-2">
+                  <input
+                    id="privacy-policy"
+                    type="checkbox"
+                    checked={acceptedPolicy}
+                    onChange={(e) => setAcceptedPolicy(e.target.checked)}
+                    className="h-4 w-4 mt-1 rounded border-slate-300 text-[#2563EB] focus:ring-[#2563EB]"
+                    required
+                  />
+                  <label htmlFor="privacy-policy" className="text-xs text-[#64748B]">
+                    Acepto las{' '}
+                    <button
+                      type="button"
+                      onClick={() => setShowPolicyModal(true)}
+                      className="text-[#2563EB] hover:text-[#1D4ED8] underline font-medium"
+                    >
+                      políticas de tratamiento de datos personales
+                    </button>
+                  </label>
+                </div>
               </div>
             )}
             
-            <Button disabled={loading || (authMode === 'signup' && !acceptedPolicy)} type="submit" className="w-full mt-2">
+            <Button disabled={loading || (authMode === 'signup' && (!acceptedTerms || !acceptedPolicy))} type="submit" className="w-full mt-2">
               {loading ? 'Procesando...' : authMode === 'signin' ? 'Entrar' : 'Crear cuenta'}
             </Button>
 
-            {authMode === 'signup' && !acceptedPolicy && (
+            {authMode === 'signup' && (!acceptedTerms || !acceptedPolicy) && (
               <p className="text-xs text-[#F59E0B] text-center mt-2">
-                ⚠️ Debes aceptar las políticas para continuar
+                ⚠️ Debes aceptar los términos y las políticas para continuar
               </p>
             )}
 
@@ -1888,6 +1919,12 @@ export default function HomePage() {
         <PrivacyPolicyModal 
           isOpen={showPolicyModal}
           onClose={() => setShowPolicyModal(false)}
+        />
+
+        {/* MODAL: Términos y Condiciones */}
+        <TermsAndConditionsModal 
+          isOpen={showTermsModal}
+          onClose={() => setShowTermsModal(false)}
         />
       </div>
     );
