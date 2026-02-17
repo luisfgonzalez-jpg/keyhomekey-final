@@ -38,17 +38,16 @@ async function restoreDatabase(backupDate: string) {
     console.log(`  ⏳ Restaurando ${table}: ${data.length} registros`);
 
     // Nota: Esto requiere permisos de admin y cuidado con constraints
-    for (const record of data) {
-      const { error } = await supabase
-        .from(table)
-        .upsert(record);
-        
-      if (error) {
-        console.error(`  ❌ Error restaurando registro:`, error);
-      }
+    // Usar batch upsert para mejor rendimiento
+    const { error } = await supabase
+      .from(table)
+      .upsert(data);
+      
+    if (error) {
+      console.error(`  ❌ Error restaurando ${table}:`, error);
+    } else {
+      console.log(`  ✅ ${table} restaurado`);
     }
-    
-    console.log(`  ✅ ${table} restaurado`);
   }
 
   console.log(`✅ Restauración completada`);
