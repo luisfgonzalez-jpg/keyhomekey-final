@@ -71,7 +71,7 @@ export default function AdminTicketsPage() {
         .from('tickets')
         .select(`
           *,
-          properties:property_id (
+          properties!property_id (
             address,
             department,
             municipality
@@ -79,7 +79,17 @@ export default function AdminTicketsPage() {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
+
+      console.log('Tickets loaded successfully:', data?.length || 0);
 
       // Transform data to match our interface
       const transformedTickets = data?.map(ticket => ({
@@ -94,6 +104,7 @@ export default function AdminTicketsPage() {
       setTickets(transformedTickets);
     } catch (error) {
       console.error('Error loading tickets:', error);
+      alert('Error al cargar tickets. Revisa la consola para más detalles.');
     } finally {
       setLoading(false);
     }
