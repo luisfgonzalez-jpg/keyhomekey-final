@@ -59,12 +59,12 @@ async function autoApproveTickets() {
           continue;
         }
 
-        // Add timeline event
+        // Add timeline event (use ticket provider's user_id or null for system events)
         const { error: timelineError } = await supabase
           .from('ticket_comments')
           .insert({
             ticket_id: ticket.id,
-            user_id: ticket.assigned_provider_id || '00000000-0000-0000-0000-000000000000',
+            user_id: ticket.providers?.user_id || null,
             user_name: 'Sistema',
             user_role: 'SYSTEM',
             comment_text: 'Ticket auto-aprobado después de 3 días sin respuesta',

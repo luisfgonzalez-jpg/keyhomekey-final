@@ -50,7 +50,6 @@ CREATE POLICY "Users can view approvals on their tickets"
 CREATE POLICY "Property owners and tenants can create approvals"
   ON ticket_approvals FOR INSERT
   WITH CHECK (
-    auth.uid() = approved_by AND
     EXISTS (
       SELECT 1 FROM tickets t
       LEFT JOIN properties p ON t.property_id = p.id

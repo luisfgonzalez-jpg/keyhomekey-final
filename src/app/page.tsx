@@ -3152,12 +3152,7 @@ export default function HomePage() {
                 {/* Action Buttons for Providers */}
                 {selectedTicket.status === 'En progreso' && 
                  session?.user?.id && 
-                 (() => {
-                   // Check if user is the assigned provider
-                   // This requires checking if there's a provider assigned and matching user_id
-                   const isProvider = userRole === 'PROVIDER';
-                   return isProvider;
-                 })() && (
+                 userRole === 'PROVIDER' && (
                   <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                     <p className="text-sm text-blue-800 mb-3">
                       ¿Has terminado el trabajo? Marca el ticket como completado para que el propietario/inquilino pueda aprobar.

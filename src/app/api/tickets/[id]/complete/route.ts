@@ -33,7 +33,14 @@ export async function POST(
       );
     }
 
-    // Verify user is the assigned provider
+    // Check if provider is assigned and verify user is the assigned provider
+    if (!ticket.assigned_provider_id) {
+      return NextResponse.json(
+        { error: 'No hay proveedor asignado a este ticket' },
+        { status: 400 }
+      );
+    }
+
     if (!ticket.providers || ticket.providers.user_id !== user.id) {
       return NextResponse.json(
         { error: 'Solo el proveedor asignado puede marcar el ticket como completado' },

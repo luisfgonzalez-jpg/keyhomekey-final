@@ -237,7 +237,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                       <h4 className="text-sm font-semibold text-[#1E293B]">
                         {provider.full_name}
                       </h4>
-                      {/* Provider rating placeholder - will be populated from database */}
+                      {/* TODO: Provider rating - fetch from database using get_provider_rating() function */}
                       <div className="flex items-center gap-1">
                         <Star className="text-yellow-500 fill-yellow-500" size={14} />
                         <span className="text-xs font-semibold text-gray-700">4.8</span>

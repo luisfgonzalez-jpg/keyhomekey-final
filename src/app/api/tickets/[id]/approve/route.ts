@@ -74,9 +74,11 @@ export async function POST(
     const { data: authUser } = await supabase.auth.getUser();
     const userEmail = authUser.user?.email;
 
-    // Verify user is owner or tenant
+    // Verify user is owner or tenant (check both tenant_id and tenant_email)
     const isOwner = ticket.properties.owner_id === user.id;
-    const isTenant = ticket.properties.tenant_email === userEmail;
+    const isTenantByEmail = ticket.properties.tenant_email === userEmail;
+    const isTenantById = ticket.properties.tenant_id === user.id;
+    const isTenant = isTenantByEmail || isTenantById;
 
     if (!isOwner && !isTenant) {
       return NextResponse.json(

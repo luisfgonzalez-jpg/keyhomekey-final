@@ -249,6 +249,9 @@ export default function TicketApprovalModal({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Fotos de Evidencia <span className="text-gray-500 font-normal">(opcional)</span>
                 </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Nota: La función de subida de fotos se implementará próximamente.
+                </p>
                 
                 {/* File previews */}
                 {previewUrls.length > 0 && (
@@ -274,6 +277,7 @@ export default function TicketApprovalModal({
                   </div>
                 )}
 
+                {/* Temporarily disabled until upload is implemented
                 <input
                   type="file"
                   id="evidence-upload"
@@ -290,6 +294,7 @@ export default function TicketApprovalModal({
                   <Upload className="w-4 h-4" />
                   <span>Subir fotos</span>
                 </label>
+                */}
               </div>
 
               {/* Action buttons */}
