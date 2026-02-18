@@ -2308,8 +2308,11 @@ export default function HomePage() {
                     >
                       <option value="all">Todos los estados</option>
                       <option value="Pendiente">Pendiente</option>
+                      <option value="Asignado">Asignado</option>
                       <option value="En progreso">En progreso</option>
+                      <option value="Completado">Completado</option>
                       <option value="Resuelto">Resuelto</option>
+                      <option value="Rechazado">Rechazado</option>
                     </select>
                   </div>
                   
