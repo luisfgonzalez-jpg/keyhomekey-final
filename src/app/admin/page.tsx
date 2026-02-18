@@ -22,8 +22,13 @@ interface Stats {
 
 const STATUS_COLORS = {
   Pendiente: '#F59E0B',
-  'En proceso': '#3B82F6',
+  Asignado: '#A855F7',
+  'En progreso': '#3B82F6',
   Completado: '#10B981',
+  Resuelto: '#059669',
+  Rechazado: '#EF4444',
+  // Soporte para estado antiguo
+  'En proceso': '#3B82F6',
 };
 
 const PRIORITY_COLORS = {
@@ -65,8 +70,11 @@ export default function AdminDashboard() {
 
       // Count tickets by status
       const pendingTickets = tickets?.filter(t => t.status === 'Pendiente').length || 0;
-      const inProgressTickets = tickets?.filter(t => t.status === 'En proceso').length || 0;
+      const asignedTickets = tickets?.filter(t => t.status === 'Asignado').length || 0;
+      const inProgressTickets = tickets?.filter(t => t.status === 'En progreso' || t.status === 'En proceso').length || 0;
       const completedTickets = tickets?.filter(t => t.status === 'Completado').length || 0;
+      const resolvedTickets = tickets?.filter(t => t.status === 'Resuelto').length || 0;
+      const rejectedTickets = tickets?.filter(t => t.status === 'Rechazado').length || 0;
 
       // Get tickets by status for pie chart
       const statusCounts = tickets?.reduce((acc, ticket) => {
