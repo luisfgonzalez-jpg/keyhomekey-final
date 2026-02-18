@@ -30,11 +30,11 @@ Complete administrative panel for managing tickets and service providers in the 
 - Comprehensive table showing all system tickets
 - Columns: ID, Category, Property Address, Status, Priority, Reporter, Assigned Provider, Creation Date
 - Color-coded badges:
-  - Status: Pendiente (yellow), En proceso (blue), Completado (green)
+  - Status: Pendiente (yellow), Asignado (purple), En progreso (blue), Completado (green), Resuelto (emerald), Rechazado (red)
   - Priority: Alta (red), Media (orange), Baja (gray)
 
 **Advanced Filters:**
-- Status filter (All, Pendiente, En proceso, Completado)
+- Status filter (All, Pendiente, Asignado, En progreso, Completado, Resuelto, Rechazado)
 - Category filter (All specialties)
 - Priority filter (All, Alta, Media, Baja)
 - Search by ID, address, or reporter name
@@ -195,7 +195,7 @@ supabase/migrations/
 - property_id (UUID, foreign key to properties)
 - category (TEXT, service category)
 - description (TEXT, issue description)
-- status (TEXT: Pendiente, En proceso, Completado)
+- status (TEXT: Pendiente, Asignado, En progreso, Completado, Resuelto, Rechazado)
 - priority (TEXT: Alta, Media, Baja)
 - reporter (TEXT, name of person reporting)
 - reported_by_email (TEXT, optional)
