@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { MessageCircle, Upload, Send, Image as ImageIcon, X, Clock } from 'lucide-react';
+import { MessageCircle, Upload, Send, Image as ImageIcon, X, Clock, CheckCircle, ThumbsUp, ThumbsDown, Star } from 'lucide-react';
 import Image from 'next/image';
 
 interface Comment {
@@ -270,8 +270,42 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
         return 'Inquilino';
       case 'PROVIDER':
         return 'Proveedor';
+      case 'SYSTEM':
+        return 'Sistema';
       default:
         return role;
+    }
+  };
+
+  const getEventIcon = (commentType: string) => {
+    switch (commentType) {
+      case 'status_change':
+        return <CheckCircle className="w-5 h-5 text-blue-600" />;
+      case 'approved':
+        return <ThumbsUp className="w-5 h-5 text-green-600" />;
+      case 'rejected':
+        return <ThumbsDown className="w-5 h-5 text-red-600" />;
+      case 'auto_approved':
+        return <Clock className="w-5 h-5 text-yellow-600" />;
+      case 'media_added':
+        return <ImageIcon className="w-5 h-5 text-purple-600" />;
+      default:
+        return <MessageCircle className="w-5 h-5 text-gray-600" />;
+    }
+  };
+
+  const getEventColor = (commentType: string) => {
+    switch (commentType) {
+      case 'status_change':
+        return 'bg-blue-50 border-blue-200';
+      case 'approved':
+        return 'bg-green-50 border-green-200';
+      case 'rejected':
+        return 'bg-red-50 border-red-200';
+      case 'auto_approved':
+        return 'bg-yellow-50 border-yellow-200';
+      default:
+        return 'bg-white border-gray-200';
     }
   };
 
@@ -394,13 +428,22 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
             </div>
           ) : (
             comments.map((comment) => (
-              <div key={comment.id} className="p-6 hover:bg-gray-50 transition-colors">
+              <div 
+                key={comment.id} 
+                className={`p-6 border-l-4 ${getEventColor(comment.comment_type)} hover:shadow-md transition-all`}
+              >
                 <div className="flex gap-4">
-                  {/* Avatar */}
+                  {/* Icon or Avatar */}
                   <div className="flex-shrink-0">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
-                      {comment.user_name.charAt(0).toUpperCase()}
-                    </div>
+                    {['status_change', 'approved', 'rejected', 'auto_approved'].includes(comment.comment_type) ? (
+                      <div className="w-10 h-10 rounded-full bg-white border-2 border-gray-300 flex items-center justify-center">
+                        {getEventIcon(comment.comment_type)}
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
+                        {comment.user_name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
 
                   {/* Content */}
@@ -425,6 +468,38 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
                     <p className="text-gray-700 whitespace-pre-wrap mb-3">
                       {comment.comment_text}
                     </p>
+
+                    {/* Show rating if it's an approval */}
+                    {comment.comment_type === 'approved' && comment.metadata?.rating && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              size={16}
+                              className={
+                                star <= (comment.metadata?.rating as number)
+                                  ? 'text-yellow-500 fill-yellow-500'
+                                  : 'text-gray-300'
+                              }
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm font-semibold text-gray-700">
+                          {comment.metadata.rating}/5
+                        </span>
+                        {comment.metadata.quality_score && (
+                          <span className="text-xs text-gray-500">
+                            · Calidad: {comment.metadata.quality_score}/5
+                          </span>
+                        )}
+                        {comment.metadata.punctuality_score && (
+                          <span className="text-xs text-gray-500">
+                            · Puntualidad: {comment.metadata.punctuality_score}/5
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Media attachments */}
                     {comment.media_urls && comment.media_urls.length > 0 && (

@@ -9,6 +9,7 @@ import TicketTimeline from '@/components/TicketTimeline';
 import ProviderSelector from '@/components/ProviderSelector';
 import PrivacyPolicyModal from '@/components/PrivacyPolicyModal';
 import TermsAndConditionsModal from '@/components/TermsAndConditionsModal';
+import TicketApprovalModal, { ApprovalData } from '@/components/TicketApprovalModal';
 
 import {
   Home,
@@ -246,8 +247,11 @@ const TextArea = ({
 const StatusBadge = ({ status }: { status: string }) => {
   const colors: Record<string, string> = {
     Pendiente: 'bg-[#FEF3C7] text-[#92400E] border border-[#FCD34D]',
-    'En progreso': 'bg-[#DBEAFE] text-[#1E40AF] border border-[#60A5FA]',
+    Asignado: 'bg-[#DBEAFE] text-[#1E40AF] border border-[#60A5FA]',
+    'En progreso': 'bg-[#FEF3C7] text-[#D97706] border border-[#FBBF24]',
+    Completado: 'bg-[#DDD6FE] text-[#6B21A8] border border-[#A78BFA]',
     Resuelto: 'bg-[#D1FAE5] text-[#065F46] border border-[#34D399]',
+    Rechazado: 'bg-[#FEE2E2] text-[#991B1B] border border-[#FCA5A5]',
     Propietario: 'bg-[#EDE9FE] text-[#5B21B6] border border-[#A78BFA]',
     Inquilino: 'bg-[#DBEAFE] text-[#1E40AF] border border-[#60A5FA]',
     Proveedor: 'bg-[#D1FAE5] text-[#065F46] border border-[#34D399]',
@@ -853,6 +857,10 @@ export default function HomePage() {
     category: '',
   });
   const [editTicketFiles, setEditTicketFiles] = useState<File[]>([]);
+  
+  // Approval modal states
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
 
   // Estados para modales
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -1406,6 +1414,106 @@ export default function HomePage() {
       setLoading(false);
     }
   }, [selectedTicket, session, editTicketForm, editTicketFiles, supabase]);
+
+  // Handler for provider marking ticket as completed
+  const handleMarkAsCompleted = useCallback(async () => {
+    if (!selectedTicket || !session?.user) return;
+
+    const confirm = window.confirm('¿Marcar este ticket como completado? El propietario/inquilino será notificado para aprobar el trabajo.');
+    if (!confirm) return;
+
+    try {
+      setLoading(true);
+
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const token = currentSession?.access_token;
+
+      if (!token) {
+        alert('No se pudo obtener el token de autenticación');
+        return;
+      }
+
+      const response = await fetch(`/api/tickets/${selectedTicket.id}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          evidencePhotos: [],
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        alert(`Error: ${result.error || 'No se pudo completar el ticket'}`);
+        return;
+      }
+
+      // Update local state
+      setTickets((prev) =>
+        prev.map((t) => (t.id === selectedTicket.id ? { ...t, status: 'Completado' } : t))
+      );
+      setSelectedTicket({ ...selectedTicket, status: 'Completado' });
+      alert('✅ Ticket marcado como completado');
+    } catch (err: any) {
+      console.error('Error completing ticket:', err);
+      alert(`Error: ${err.message || 'No se pudo completar el ticket'}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedTicket, session, supabase]);
+
+  // Handler for approval/rejection
+  const handleApprovalSubmit = useCallback(async (approvalData: ApprovalData) => {
+    if (!selectedTicket || !session?.user) return;
+
+    try {
+      setLoading(true);
+
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const token = currentSession?.access_token;
+
+      if (!token) {
+        alert('No se pudo obtener el token de autenticación');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`/api/tickets/${selectedTicket.id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(approvalData),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        alert(`Error: ${result.error || 'No se pudo procesar la acción'}`);
+        setLoading(false);
+        return;
+      }
+
+      // Update local state
+      const newStatus = approvalData.action === 'approved' ? 'Resuelto' : 'Rechazado';
+      setTickets((prev) =>
+        prev.map((t) => (t.id === selectedTicket.id ? { ...t, status: newStatus } : t))
+      );
+      setSelectedTicket({ ...selectedTicket, status: newStatus });
+      
+      alert(result.message || '✅ Acción completada exitosamente');
+      setShowApprovalModal(false);
+    } catch (err: any) {
+      console.error('Error processing approval:', err);
+      alert(`Error: ${err.message || 'No se pudo procesar la acción'}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedTicket, session, supabase]);
 
   // Keyboard accessibility for ticket modal
   useEffect(() => {
@@ -3041,6 +3149,66 @@ export default function HomePage() {
                   </div>
                 </div>
 
+                {/* Action Buttons for Providers */}
+                {selectedTicket.status === 'En progreso' && 
+                 session?.user?.id && 
+                 (() => {
+                   // Check if user is the assigned provider
+                   // This requires checking if there's a provider assigned and matching user_id
+                   const isProvider = userRole === 'PROVIDER';
+                   return isProvider;
+                 })() && (
+                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                    <p className="text-sm text-blue-800 mb-3">
+                      ¿Has terminado el trabajo? Marca el ticket como completado para que el propietario/inquilino pueda aprobar.
+                    </p>
+                    <button
+                      onClick={handleMarkAsCompleted}
+                      disabled={loading}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <CheckCircle size={16} />
+                      Marcar como Completado
+                    </button>
+                  </div>
+                )}
+
+                {/* Action Buttons for Owners/Tenants */}
+                {selectedTicket.status === 'Completado' && 
+                 (ticketProperty?.owner_id === session?.user?.id || 
+                  ticketProperty?.tenant_email === session?.user?.email ||
+                  ticketProperty?.tenant_id === session?.user?.id) && (
+                  <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                    <p className="text-sm text-purple-800 mb-3">
+                      El proveedor ha marcado el ticket como completado. Por favor, revisa el trabajo y aprueba o rechaza.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setApprovalAction('approve');
+                          setShowApprovalModal(true);
+                        }}
+                        disabled={loading}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <CheckCircle size={16} />
+                        Aprobar Trabajo
+                      </button>
+                      <button
+                        onClick={() => {
+                          setApprovalAction('reject');
+                          setShowApprovalModal(true);
+                        }}
+                        disabled={loading}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <X size={16} />
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Timeline Section */}
                 <div className="border-t border-[#E2E8F0] pt-6">
                   <TicketTimeline ticketId={selectedTicket.id} />
@@ -3050,6 +3218,15 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* Ticket Approval Modal */}
+      <TicketApprovalModal
+        isOpen={showApprovalModal}
+        onClose={() => setShowApprovalModal(false)}
+        onSubmit={handleApprovalSubmit}
+        action={approvalAction}
+        ticketId={selectedTicket?.id || ''}
+      />
     </div>
   );
 }
