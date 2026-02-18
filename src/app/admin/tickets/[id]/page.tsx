@@ -62,7 +62,7 @@ export default function AdminTicketDetailPage() {
         .from('tickets')
         .select(`
           *,
-          properties:property_id (
+          properties!property_id (
             id,
             address,
             department,
@@ -73,7 +73,15 @@ export default function AdminTicketDetailPage() {
         .eq('id', ticketId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
 
       const ticketData = {
         ...data,
