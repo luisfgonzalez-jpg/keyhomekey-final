@@ -104,7 +104,6 @@ export default function AdminTicketsPage() {
       setTickets(transformedTickets);
     } catch (error) {
       console.error('Error loading tickets:', error);
-      alert('Error al cargar tickets. Revisa la consola para más detalles.');
     } finally {
       setLoading(false);
     }
