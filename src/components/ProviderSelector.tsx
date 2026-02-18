@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Phone, Wrench, CheckCircle, Search, Loader2, ExternalLink } from 'lucide-react';
+import { MapPin, Phone, Wrench, CheckCircle, Search, Loader2, ExternalLink, Star } from 'lucide-react';
 import { searchExternalProviders } from '@/lib/googleProviderSearch';
 import type { ExternalProvider } from '@/type/googleProvider';
 
@@ -233,9 +233,17 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                   )}
                   
                   <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-[#1E293B] pr-8">
-                      {provider.full_name}
-                    </h4>
+                    <div className="flex items-center justify-between pr-8">
+                      <h4 className="text-sm font-semibold text-[#1E293B]">
+                        {provider.full_name}
+                      </h4>
+                      {/* Provider rating placeholder - will be populated from database */}
+                      <div className="flex items-center gap-1">
+                        <Star className="text-yellow-500 fill-yellow-500" size={14} />
+                        <span className="text-xs font-semibold text-gray-700">4.8</span>
+                        <span className="text-xs text-gray-500">(12)</span>
+                      </div>
+                    </div>
                     
                     <div className="flex items-center gap-2 text-xs text-[#64748B]">
                       <Wrench size={14} />

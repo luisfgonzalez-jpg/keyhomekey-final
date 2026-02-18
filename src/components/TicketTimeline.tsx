@@ -470,7 +470,7 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
                     </p>
 
                     {/* Show rating if it's an approval */}
-                    {comment.comment_type === 'approved' && comment.metadata?.rating && (
+                    {comment.comment_type === 'approved' && comment.metadata && typeof comment.metadata === 'object' && 'rating' in comment.metadata && typeof comment.metadata.rating === 'number' && (
                       <div className="flex items-center gap-2 mb-2">
                         <div className="flex gap-1">
                           {[1, 2, 3, 4, 5].map((star) => (
@@ -488,12 +488,12 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
                         <span className="text-sm font-semibold text-gray-700">
                           {comment.metadata.rating}/5
                         </span>
-                        {comment.metadata.quality_score && (
+                        {'quality_score' in comment.metadata && typeof comment.metadata.quality_score === 'number' && (
                           <span className="text-xs text-gray-500">
                             · Calidad: {comment.metadata.quality_score}/5
                           </span>
                         )}
-                        {comment.metadata.punctuality_score && (
+                        {'punctuality_score' in comment.metadata && typeof comment.metadata.punctuality_score === 'number' && (
                           <span className="text-xs text-gray-500">
                             · Puntualidad: {comment.metadata.punctuality_score}/5
                           </span>
