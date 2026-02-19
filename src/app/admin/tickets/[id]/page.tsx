@@ -34,7 +34,7 @@ interface TicketDetail {
     address: string;
     department: string;
     municipality: string;
-    property_type: string;
+    type: string;
   };
 }
 
@@ -70,7 +70,7 @@ export default function AdminTicketDetailPage() {
             address,
             department,
             municipality,
-            property_type
+            type
           )
         `)
         .eq('id', ticketId)
@@ -92,7 +92,7 @@ export default function AdminTicketDetailPage() {
         if (ticketData.property_id) {
           const { data: propData, error: propError } = await supabase
             .from('properties')
-            .select('id, address, department, municipality, property_type')
+            .select('id, address, department, municipality, type')
             .eq('id', ticketData.property_id)
             .single();
 
@@ -133,7 +133,7 @@ export default function AdminTicketDetailPage() {
           address: 'N/A',
           department: 'N/A',
           municipality: 'N/A',
-          property_type: 'N/A'
+          type: 'N/A'
         }
       };
 
@@ -428,7 +428,7 @@ export default function AdminTicketDetailPage() {
               </div>
               <div className="border-t border-gray-200 pt-3">
                 <div className="text-sm text-gray-500">Tipo de propiedad</div>
-                <div className="text-sm font-medium text-gray-900">{ticket.property.property_type}</div>
+                <div className="text-sm font-medium text-gray-900">{ticket.property.type}</div>
               </div>
             </div>
           </div>
