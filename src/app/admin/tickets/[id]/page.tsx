@@ -58,7 +58,10 @@ export default function AdminTicketDetailPage() {
 
   async function loadTicket() {
     try {
-      const { data, error } = await supabase
+      console.log('Loading ticket with ID:', ticketId);
+
+      // Intentar primero con JOIN
+      let { data, error } = await supabase
         .from('tickets')
         .select(`
           *,
@@ -73,6 +76,40 @@ export default function AdminTicketDetailPage() {
         .eq('id', ticketId)
         .single();
 
+      // Si falla el JOIN, intentar con queries separadas
+      if (error && error.code === 'PGRST200') {
+        console.log('JOIN failed, trying separate queries...');
+
+        const { data: ticketData, error: ticketError } = await supabase
+          .from('tickets')
+          .select('*')
+          .eq('id', ticketId)
+          .single();
+
+        if (ticketError) throw ticketError;
+
+        let propertyData = null;
+        if (ticketData.property_id) {
+          const { data: propData, error: propError } = await supabase
+            .from('properties')
+            .select('id, address, department, municipality, property_type')
+            .eq('id', ticketData.property_id)
+            .single();
+
+          if (propError) {
+            console.error('Error loading property:', propError);
+          } else {
+            propertyData = propData;
+          }
+        }
+
+        data = {
+          ...ticketData,
+          properties: propertyData
+        };
+        error = null;
+      }
+
       if (error) {
         console.error('Supabase error details:', {
           message: error.message,
@@ -82,6 +119,12 @@ export default function AdminTicketDetailPage() {
         });
         throw error;
       }
+
+      console.log('Ticket data received:', {
+        id: data?.id,
+        hasProperties: !!data?.properties,
+        propertyData: data?.properties
+      });
 
       const ticketData = {
         ...data,
@@ -94,11 +137,16 @@ export default function AdminTicketDetailPage() {
         }
       };
 
+      console.log('Ticket loaded successfully:', ticketData.id);
       setTicket(ticketData);
       setEditStatus(ticketData.status);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading ticket:', error);
-      alert('Error al cargar el ticket');
+
+      const errorMessage = error?.message || 'Error desconocido';
+      const errorDetails = error?.details || '';
+
+      alert(`Error al cargar el ticket:\n${errorMessage}\n${errorDetails}`);
       router.push('/admin/tickets');
     } finally {
       setLoading(false);
