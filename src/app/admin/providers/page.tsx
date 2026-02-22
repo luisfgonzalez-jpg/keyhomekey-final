@@ -53,9 +53,13 @@ export default function ProvidersPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [creationMode, setCreationMode] = useState<'select' | 'create'>('select');
 
   const [formData, setFormData] = useState({
     user_id: '',
+    name: '',
+    email: '',
+    password: '',
     phone: '',
     specialty: 'Plomería',
     department: '',
@@ -145,24 +149,64 @@ export default function ProvidersPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!formData.user_id || !formData.phone || !formData.department || !formData.municipality) {
-      alert('Por favor completa todos los campos');
-      return;
-    }
-
     try {
       if (editingId) {
         const { error } = await supabase
           .from('providers')
-          .update(formData)
+          .update({
+            phone: formData.phone,
+            specialty: formData.specialty,
+            department: formData.department,
+            municipality: formData.municipality,
+            is_active: formData.is_active,
+          })
           .eq('id', editingId);
 
         if (error) throw error;
         alert('Proveedor actualizado correctamente');
+      } else if (creationMode === 'create') {
+        if (!formData.name || !formData.email || !formData.phone || !formData.department || !formData.municipality) {
+          alert('Por favor completa todos los campos requeridos');
+          return;
+        }
+
+        const response = await fetch('/api/admin/providers/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            specialty: formData.specialty,
+            department: formData.department,
+            municipality: formData.municipality,
+            password: formData.password || undefined,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Error al crear proveedor');
+        }
+
+        alert(`Proveedor creado correctamente!\n\nEmail: ${data.provider.email}\nContraseña temporal: ${data.temporaryPassword}\n\n⚠️ Guarda esta contraseña, no se volverá a mostrar.`);
       } else {
+        if (!formData.user_id || !formData.phone || !formData.department || !formData.municipality) {
+          alert('Por favor completa todos los campos');
+          return;
+        }
+
         const { error } = await supabase
           .from('providers')
-          .insert([formData]);
+          .insert([{
+            user_id: formData.user_id,
+            phone: formData.phone,
+            specialty: formData.specialty,
+            department: formData.department,
+            municipality: formData.municipality,
+            is_active: formData.is_active,
+          }]);
 
         if (error) throw error;
         alert('Proveedor agregado correctamente');
@@ -199,6 +243,9 @@ export default function ProvidersPage() {
   function handleEdit(provider: Provider) {
     setFormData({
       user_id: provider.user_id,
+      name: '',
+      email: '',
+      password: '',
       phone: provider.phone,
       specialty: provider.specialty,
       department: provider.department,
@@ -212,6 +259,9 @@ export default function ProvidersPage() {
   function resetForm() {
     setFormData({
       user_id: '',
+      name: '',
+      email: '',
+      password: '',
       phone: '',
       specialty: 'Plomería',
       department: '',
@@ -220,6 +270,7 @@ export default function ProvidersPage() {
     });
     setEditingId(null);
     setShowAddForm(false);
+    setCreationMode('select');
   }
 
   if (loading) {
@@ -258,24 +309,97 @@ export default function ProvidersPage() {
               {editingId ? 'Editar Proveedor' : 'Nuevo Proveedor'}
             </h2>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Usuario (Proveedor)
-                </label>
-                <select
-                  value={formData.user_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, user_id: e.target.value }))}
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Selecciona un usuario</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name} ({user.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {!editingId && (
+                <div className="md:col-span-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800 mb-2">¿El usuario ya existe o necesitas crear uno nuevo?</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCreationMode('select')}
+                      className={`px-4 py-2 rounded-lg text-sm ${
+                        creationMode === 'select'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-blue-600 border border-blue-300'
+                      }`}
+                    >
+                      Seleccionar usuario existente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreationMode('create')}
+                      className={`px-4 py-2 rounded-lg text-sm ${
+                        creationMode === 'create'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-blue-600 border border-blue-300'
+                      }`}
+                    >
+                      Crear nuevo usuario
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {creationMode === 'create' && !editingId ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre completo *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      required
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Contraseña
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.password}
+                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="Se generará automáticamente si está vacío"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Dejar vacío para generar contraseña automática</p>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Usuario (Proveedor)
+                  </label>
+                  <select
+                    value={formData.user_id}
+                    onChange={(e) => setFormData(prev => ({ ...prev, user_id: e.target.value }))}
+                    required={!editingId}
+                    disabled={!!editingId}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="">Selecciona un usuario</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

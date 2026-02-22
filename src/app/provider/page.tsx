@@ -13,7 +13,11 @@ import {
   Lock,
   User,
   LogOut,
+  CheckCircle,
+  XCircle,
+  Clock,
 } from 'lucide-react';
+import Link from 'next/link';
 
 // -----------------------------------------------------------------------------
 // COMPONENTES UI BÁSICOS (copiados en versión simple para esta página)
@@ -93,6 +97,36 @@ const Input = ({ icon: Icon, ...props }: any) => (
 
 type AuthMode = 'signin' | 'signup';
 
+interface Ticket {
+  id: string;
+  category: string;
+  description: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  properties?: {
+    address: string;
+    department: string;
+    municipality: string;
+  };
+}
+
+// -----------------------------------------------------------------------------
+// HELPERS
+// -----------------------------------------------------------------------------
+
+function getStatusBadge(status: string): string {
+  const map: Record<string, string> = {
+    'Asignado': 'bg-blue-100 text-blue-800',
+    'En progreso': 'bg-yellow-100 text-yellow-800',
+    'Completado': 'bg-green-100 text-green-800',
+    'Resuelto': 'bg-green-100 text-green-800',
+    'Rechazado': 'bg-red-100 text-red-800',
+    'Pendiente': 'bg-gray-100 text-gray-800',
+  };
+  return map[status] || 'bg-gray-100 text-gray-800';
+}
+
 // -----------------------------------------------------------------------------
 // PÁGINA DE PROVEEDOR
 // -----------------------------------------------------------------------------
@@ -114,6 +148,11 @@ export default function ProviderPage() {
   const [department, setDepartment] = useState('');
   const [municipality, setMunicipality] = useState('');
   const [availableCities, setAvailableCities] = useState<string[]>([]);
+
+  // dashboard state
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [stats, setStats] = useState({ active: 0, completed: 0 });
+  const [dashboardLoading, setDashboardLoading] = useState(false);
 
   // ---------------------------------------------------------------------------
   // CARGAR SESIÓN SI YA ESTÁ LOGUEADO
@@ -142,12 +181,107 @@ export default function ProviderPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (session) {
+      loadProviderData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
   const handleDepartmentChange = (dept: string) => {
     setDepartment(dept);
     setMunicipality('');
     const found = colombiaLocations.find((d) => d.departamento === dept);
     setAvailableCities(found ? found.ciudades : []);
   };
+
+  // ---------------------------------------------------------------------------
+  // CARGAR DATOS DEL DASHBOARD
+  // ---------------------------------------------------------------------------
+
+  async function loadProviderData() {
+    setDashboardLoading(true);
+    try {
+      const { data: provider } = await supabase
+        .from('providers')
+        .select('id')
+        .eq('user_id', session!.user.id)
+        .single();
+
+      if (!provider) return;
+
+      const { data: ticketsData } = await supabase
+        .from('tickets')
+        .select(`
+          id,
+          category,
+          description,
+          status,
+          priority,
+          created_at,
+          properties!property_id (
+            address,
+            department,
+            municipality
+          )
+        `)
+        .eq('assigned_provider_id', provider.id)
+        .order('created_at', { ascending: false });
+
+      const list = (ticketsData || []) as unknown as Ticket[];
+      setTickets(list);
+
+      const active = list.filter(t => t.status !== 'Completado' && t.status !== 'Resuelto' && t.status !== 'Rechazado').length;
+      const completed = list.filter(t => t.status === 'Completado' || t.status === 'Resuelto').length;
+      setStats({ active, completed });
+    } catch (error) {
+      console.error('Error loading provider data:', error);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // ACCIONES DE TICKETS
+  // ---------------------------------------------------------------------------
+
+  async function handleAcceptTicket(ticketId: string) {
+    try {
+      const res = await fetch(`/api/provider/tickets/${ticketId}/accept`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await loadProviderData();
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    }
+  }
+
+  async function handleRejectTicket(ticketId: string) {
+    if (!confirm('¿Estás seguro de rechazar este ticket?')) return;
+    try {
+      const res = await fetch(`/api/provider/tickets/${ticketId}/reject`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await loadProviderData();
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    }
+  }
+
+  async function handleCompleteTicket(ticketId: string) {
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evidencePhotos: [] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await loadProviderData();
+    } catch (error: any) {
+      alert(`Error: ${error.message}`);
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // REGISTRO / LOGIN DE PROVEEDOR
@@ -389,7 +523,7 @@ export default function ProviderPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // DASHBOARD SIMPLE DEL PROVEEDOR (luego lo mejoramos)
+  // DASHBOARD DEL PROVEEDOR
   // ---------------------------------------------------------------------------
 
   const user: SupabaseUser | undefined = session.user;
@@ -424,18 +558,100 @@ export default function ProviderPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
-        <Card className="p-5">
-          <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="p-5">
+            <div className="flex items-center gap-3">
+              <Clock size={20} className="text-yellow-500" />
+              <div>
+                <div className="text-2xl font-bold text-slate-900">{stats.active}</div>
+                <div className="text-xs text-slate-500">Tickets Activos</div>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-5">
+            <div className="flex items-center gap-3">
+              <CheckCircle size={20} className="text-green-500" />
+              <div>
+                <div className="text-2xl font-bold text-slate-900">{stats.completed}</div>
+                <div className="text-xs text-slate-500">Completados</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Tickets List */}
+        <Card className="p-6">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <Home size={16} />
-            Bienvenido, proveedor
+            Mis Tickets
           </h3>
-          <p className="text-xs text-slate-600">
-            Aquí podrás ver los tickets que te asignemos según tu especialidad y
-            ubicación. En la siguiente fase conectaremos este panel con la tabla
-            de <strong>tickets</strong> para que puedas aceptar o rechazar
-            trabajos y actualizar su estado.
-          </p>
+
+          {dashboardLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600"></div>
+            </div>
+          ) : tickets.length === 0 ? (
+            <p className="text-xs text-slate-500">No tienes tickets asignados aún.</p>
+          ) : (
+            <div className="space-y-4">
+              {tickets.map((ticket) => (
+                <div key={ticket.id} className="border border-slate-200 rounded-xl p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="text-sm font-medium text-slate-900">{ticket.category}</div>
+                      {ticket.properties && (
+                        <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                          <MapPin size={11} />
+                          {ticket.properties.address} – {ticket.properties.municipality}
+                        </div>
+                      )}
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadge(ticket.status)}`}>
+                      {ticket.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mb-3 line-clamp-2">{ticket.description}</p>
+                  <div className="flex gap-3 flex-wrap">
+                    <Link
+                      href={`/provider/tickets/${ticket.id}`}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Ver detalle
+                    </Link>
+                    {ticket.status === 'Asignado' && (
+                      <>
+                        <button
+                          onClick={() => handleAcceptTicket(ticket.id)}
+                          className="flex items-center gap-1 text-xs text-green-600 hover:underline"
+                        >
+                          <CheckCircle size={12} />
+                          Aceptar
+                        </button>
+                        <button
+                          onClick={() => handleRejectTicket(ticket.id)}
+                          className="flex items-center gap-1 text-xs text-red-600 hover:underline"
+                        >
+                          <XCircle size={12} />
+                          Rechazar
+                        </button>
+                      </>
+                    )}
+                    {ticket.status === 'En progreso' && (
+                      <button
+                        onClick={() => handleCompleteTicket(ticket.id)}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                      >
+                        <CheckCircle size={12} />
+                        Marcar completado
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </main>
     </div>
