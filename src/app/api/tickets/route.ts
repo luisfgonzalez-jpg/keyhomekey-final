@@ -80,7 +80,9 @@ export async function POST(request: Request) {
           category,
           description,
           priority,
-          status: 'Pendiente',
+          status: assigned_provider_id && assigned_provider_id !== EXTERNAL_PROVIDER_ID
+            ? 'Asignado'
+            : 'Pendiente',
           reporter,
           reported_by_email,
           media_urls: mediaPaths,
