@@ -42,6 +42,115 @@ const emailTemplates = {
         <p>Best Regards,<br/>The KeyhomeKey Team</p>
     </div>`,
 
+    providerWelcome: `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Bienvenido a KeyHomeKey - Proveedor</title>
+    </head>
+    <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f6f9fc;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f6f9fc; padding: 20px 0;">
+            <tr>
+                <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 600px;">
+                        <!-- Header -->
+                        <tr>
+                            <td style="background-color: #1e293b; padding: 32px 20px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: bold;">🔑 KeyHomeKey</h1>
+                            </td>
+                        </tr>
+
+                        <!-- Main Content -->
+                        <tr>
+                            <td style="padding: 0 48px 48px 48px;">
+                                <h2 style="font-size: 24px; font-weight: bold; color: #1e293b; margin-top: 32px; margin-bottom: 16px;">
+                                    ¡Bienvenido/a a KeyHomeKey, {{providerName}}!
+                                </h2>
+
+                                <p style="font-size: 16px; line-height: 26px; color: #475569; margin-bottom: 16px;">
+                                    Tu cuenta de proveedor ha sido creada exitosamente. Ahora formas parte de nuestra red de proveedores de servicios.
+                                </p>
+
+                                <!-- Credentials Box -->
+                                <div style="background-color: #f1f5f9; border-radius: 8px; padding: 24px; margin-top: 24px; margin-bottom: 24px; border: 2px solid #e2e8f0;">
+                                    <p style="font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 16px; margin-top: 0;">📧 Tus credenciales de acceso:</p>
+                                    <p style="font-size: 15px; line-height: 28px; color: #334155; margin: 8px 0; font-family: monospace;">
+                                        <strong>Email:</strong> {{email}}
+                                    </p>
+                                    <p style="font-size: 15px; line-height: 28px; color: #334155; margin: 8px 0; font-family: monospace;">
+                                        <strong>Contraseña temporal:</strong> {{password}}
+                                    </p>
+                                    <p style="font-size: 15px; line-height: 28px; color: #334155; margin: 8px 0; font-family: monospace;">
+                                        <strong>Especialidad:</strong> {{specialty}}
+                                    </p>
+                                </div>
+
+                                <!-- Warning -->
+                                <div style="font-size: 14px; line-height: 24px; color: #dc2626; background-color: #fef2f2; padding: 16px; border-radius: 8px; border-left: 4px solid #dc2626; margin-top: 24px; margin-bottom: 24px;">
+                                    ⚠️ <strong>IMPORTANTE:</strong> Por seguridad, te recomendamos cambiar tu contraseña después de iniciar sesión por primera vez.
+                                </div>
+
+                                <!-- CTA Button -->
+                                <div style="text-align: center; margin-top: 32px; margin-bottom: 32px;">
+                                    <a href="{{loginUrl}}" style="background-color: #1e293b; border-radius: 8px; color: #ffffff; font-size: 16px; font-weight: bold; text-decoration: none; text-align: center; display: inline-block; padding: 14px 32px;">
+                                        Acceder a mi panel de proveedor
+                                    </a>
+                                </div>
+
+                                <hr style="border-color: #e2e8f0; margin: 32px 0;" />
+
+                                <p style="font-size: 16px; line-height: 26px; color: #475569; margin-bottom: 16px;">
+                                    <strong>¿Qué puedes hacer en tu panel de proveedor?</strong>
+                                </p>
+                                <p style="font-size: 14px; line-height: 24px; color: #475569; margin: 8px 0; padding-left: 8px;">✅ Ver tickets de servicio asignados a ti</p>
+                                <p style="font-size: 14px; line-height: 24px; color: #475569; margin: 8px 0; padding-left: 8px;">✅ Aceptar o rechazar trabajos según tu disponibilidad</p>
+                                <p style="font-size: 14px; line-height: 24px; color: #475569; margin: 8px 0; padding-left: 8px;">✅ Actualizar el estado de los tickets</p>
+                                <p style="font-size: 14px; line-height: 24px; color: #475569; margin: 8px 0; padding-left: 8px;">✅ Marcar trabajos como completados</p>
+                                <p style="font-size: 14px; line-height: 24px; color: #475569; margin: 8px 0; padding-left: 8px;">✅ Ver tu historial completo de trabajos</p>
+
+                                <hr style="border-color: #e2e8f0; margin: 32px 0;" />
+
+                                <p style="font-size: 16px; line-height: 26px; color: #475569; margin-bottom: 16px;">
+                                    <strong>Instrucciones de acceso:</strong>
+                                </p>
+                                <p style="font-size: 14px; line-height: 24px; color: #475569; margin: 8px 0; padding-left: 8px;">1. Haz clic en el botón "Acceder a mi panel"</p>
+                                <p style="font-size: 14px; line-height: 24px; color: #475569; margin: 8px 0; padding-left: 8px;">2. Ingresa tu email y contraseña temporal</p>
+                                <p style="font-size: 14px; line-height: 24px; color: #475569; margin: 8px 0; padding-left: 8px;">3. Cambia tu contraseña por una nueva y segura</p>
+                                <p style="font-size: 14px; line-height: 24px; color: #475569; margin: 8px 0; padding-left: 8px;">4. ¡Listo! Ya puedes gestionar tus tickets</p>
+
+                                <hr style="border-color: #e2e8f0; margin: 32px 0;" />
+
+                                <p style="font-size: 14px; color: #64748b; text-align: center; margin-top: 8px;">
+                                    Si tienes alguna pregunta o necesitas ayuda, no dudes en contactarnos.
+                                </p>
+                                <p style="font-size: 14px; color: #64748b; text-align: center; margin-top: 8px;">
+                                    Gracias por ser parte de KeyHomeKey 🔑
+                                </p>
+                                <p style="font-size: 14px; color: #64748b; text-align: center; margin-top: 8px;">
+                                    <strong>Equipo KeyHomeKey</strong>
+                                </p>
+                            </td>
+                        </tr>
+
+                        <!-- Footer -->
+                        <tr>
+                            <td style="padding: 20px 30px; background-color: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0;">
+                                <p style="margin: 0; color: #94a3b8; font-size: 12px; line-height: 1.6;">
+                                    Este correo fue enviado por KeyHomeKey.<br>
+                                    Si no esperabas este mensaje, por favor ignóralo.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    `,
+
     tenantWelcome: `
     <!DOCTYPE html>
     <html lang="es">
