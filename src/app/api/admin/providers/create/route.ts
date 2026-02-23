@@ -1,10 +1,10 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAuthCookieName = process.env.SUPABASE_AUTH_COOKIE_NAME || 'sb-todzeqtqulonaaaqcdtp-auth-token';
 
 function generatePassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
@@ -19,16 +19,38 @@ function generatePassword(): string {
 
 export async function POST(request: Request) {
   try {
-    // Verify admin auth
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { user } } = await supabase.auth.getUser();
+    // Verify admin auth via cookies
+    const cookieStore = await cookies();
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    if (!user) {
+    // Get auth token from cookie
+    const authTokenCookie = cookieStore.get(supabaseAuthCookieName);
+
+    if (!authTokenCookie) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    let accessToken: string;
+    try {
+      const authData = JSON.parse(authTokenCookie.value);
+      accessToken = authData?.access_token;
+    } catch {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    if (!accessToken) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    // Get user from session token
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
+
+    if (userError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
     // Check if user is admin
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseAdmin
       .from('users_profiles')
       .select('role')
       .eq('user_id', user.id)
@@ -43,9 +65,6 @@ export async function POST(request: Request) {
     if (!name || !email || !phone || !specialty || !department || !municipality) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 });
     }
-
-    // Use service role to create user
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const finalPassword = password || generatePassword();
 
