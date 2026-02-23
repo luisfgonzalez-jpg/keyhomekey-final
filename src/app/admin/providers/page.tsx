@@ -150,7 +150,12 @@ export default function ProvidersPage() {
     e.preventDefault();
 
     try {
+      setLoading(true);
+
       if (editingId) {
+        // ========================================
+        // EDITAR PROVEEDOR EXISTENTE
+        // ========================================
         const { error } = await supabase
           .from('providers')
           .update({
@@ -164,36 +169,119 @@ export default function ProvidersPage() {
 
         if (error) throw error;
         alert('Proveedor actualizado correctamente');
+
       } else if (creationMode === 'create') {
-        if (!formData.name || !formData.email || !formData.phone || !formData.department || !formData.municipality) {
+        // ========================================
+        // CREAR NUEVO USUARIO + PROVEEDOR
+        // ========================================
+
+        if (!formData.name || !formData.email || !formData.phone || !formData.specialty || !formData.department || !formData.municipality) {
           alert('Por favor completa todos los campos requeridos');
+          setLoading(false);
           return;
         }
 
-        const response = await fetch('/api/admin/providers/create', {
+        // 1. Verificar que el usuario actual es admin
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+          alert('Debes iniciar sesión');
+          setLoading(false);
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from('users_profiles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profile?.role !== 'ADMIN') {
+          alert('Solo administradores pueden crear proveedores');
+          setLoading(false);
+          return;
+        }
+
+        // 2. Generar contraseña si no se proporcionó
+        const finalPassword = formData.password || generatePassword();
+
+        // 3. Crear usuario en auth usando service role
+        const createUserResponse = await fetch('/api/admin/create-user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            email: formData.email,
+            password: finalPassword,
+            name: formData.name,
+          }),
+        });
+
+        if (!createUserResponse.ok) {
+          const errorData = await createUserResponse.json();
+          throw new Error(errorData.error || 'Error al crear usuario');
+        }
+
+        const { userId } = await createUserResponse.json();
+
+        // 4. Crear perfil en users_profiles
+        const { error: profileError } = await supabase
+          .from('users_profiles')
+          .insert({
+            user_id: userId,
             name: formData.name,
             email: formData.email,
+            phone: formData.phone,
+            role: 'PROVIDER',
+          });
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+          await fetch('/api/admin/delete-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          });
+          throw new Error('Error al crear perfil: ' + profileError.message);
+        }
+
+        // 5. Crear proveedor en tabla providers
+        const { error: providerError } = await supabase
+          .from('providers')
+          .insert({
+            user_id: userId,
             phone: formData.phone,
             specialty: formData.specialty,
             department: formData.department,
             municipality: formData.municipality,
-            password: formData.password || undefined,
-          }),
-        });
+            is_active: true,
+          });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Error al crear proveedor');
+        if (providerError) {
+          console.error('Error creating provider:', providerError);
+          await supabase.from('users_profiles').delete().eq('user_id', userId);
+          await fetch('/api/admin/delete-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+          });
+          throw new Error('Error al crear proveedor: ' + providerError.message);
         }
 
-        alert(`Proveedor creado correctamente!\n\nEmail: ${data.provider.email}\nContraseña temporal: ${data.temporaryPassword}\n\n⚠️ Guarda esta contraseña, no se volverá a mostrar.`);
+        // 6. Mostrar credenciales generadas
+        alert(
+          `✅ Proveedor creado correctamente!\n\n` +
+          `Email: ${formData.email}\n` +
+          `Contraseña: ${finalPassword}\n\n` +
+          `⚠️ Guarda esta contraseña, no se volverá a mostrar.`
+        );
+
       } else {
+        // ========================================
+        // CREAR PROVEEDOR CON USUARIO EXISTENTE
+        // ========================================
         if (!formData.user_id || !formData.phone || !formData.department || !formData.municipality) {
           alert('Por favor completa todos los campos');
+          setLoading(false);
           return;
         }
 
@@ -215,9 +303,53 @@ export default function ProvidersPage() {
       resetForm();
       await loadProviders();
     } catch (error: any) {
-      console.error('Error saving provider:', error);
+      console.error('❌ Error saving provider:', error);
       alert(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
+  }
+
+  function generatePassword(): string {
+    const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghjkmnpqrstuvwxyz';
+    const numbers = '23456789';
+    const special = '!@#$%';
+
+    const randomIndex = (str: string) => {
+      const bytes = new Uint8Array(1);
+      let idx: number;
+      do {
+        crypto.getRandomValues(bytes);
+        idx = bytes[0];
+      } while (idx >= Math.floor(256 / str.length) * str.length);
+      return idx % str.length;
+    };
+
+    let password = '';
+    password += upper[randomIndex(upper)];
+    password += lower[randomIndex(lower)];
+    password += numbers[randomIndex(numbers)];
+    password += special[randomIndex(special)];
+
+    for (let i = password.length; i < 12; i++) {
+      password += charset[randomIndex(charset)];
+    }
+
+    // Shuffle using Fisher-Yates with crypto random values
+    const arr = password.split('');
+    for (let i = arr.length - 1; i > 0; i--) {
+      const bytes = new Uint8Array(1);
+      let j: number;
+      do {
+        crypto.getRandomValues(bytes);
+        j = bytes[0];
+      } while (j >= Math.floor(256 / (i + 1)) * (i + 1));
+      j = j % (i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr.join('');
   }
 
   async function handleDelete(id: string) {
