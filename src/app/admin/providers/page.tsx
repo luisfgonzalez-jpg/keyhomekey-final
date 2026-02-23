@@ -206,7 +206,7 @@ export default function ProvidersPage() {
         const finalPassword = formData.password || generatePassword();
 
         // 3. Crear usuario en auth usando service role
-        const createUserResponse = await fetch('/api/admin/create-user', {
+        const signupResponse = await fetch('/api/auth/signup-provider', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -216,12 +216,12 @@ export default function ProvidersPage() {
           }),
         });
 
-        if (!createUserResponse.ok) {
-          const errorData = await createUserResponse.json();
+        if (!signupResponse.ok) {
+          const errorData = await signupResponse.json();
           throw new Error(errorData.error || 'Error al crear usuario');
         }
 
-        const { userId } = await createUserResponse.json();
+        const { userId } = await signupResponse.json();
 
         // 4. Crear perfil en users_profiles
         const { error: profileError } = await supabase
@@ -236,40 +236,54 @@ export default function ProvidersPage() {
 
         if (profileError) {
           console.error('Error creating profile:', profileError);
-          await fetch('/api/admin/delete-user', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId }),
-          });
           throw new Error('Error al crear perfil: ' + profileError.message);
         }
 
-        // 5. Crear proveedor en tabla providers
-        const { error: providerError } = await supabase
-          .from('providers')
-          .insert({
+        // 5. Crear proveedor usando service role (via endpoint)
+        const providerResponse = await fetch('/api/admin/providers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             user_id: userId,
             phone: formData.phone,
             specialty: formData.specialty,
             department: formData.department,
             municipality: formData.municipality,
-            is_active: true,
-          });
+          }),
+        });
 
-        if (providerError) {
-          console.error('Error creating provider:', providerError);
-          await supabase.from('users_profiles').delete().eq('user_id', userId);
-          await fetch('/api/admin/delete-user', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId }),
-          });
-          throw new Error('Error al crear proveedor: ' + providerError.message);
+        if (!providerResponse.ok) {
+          const errorData = await providerResponse.json();
+          throw new Error(errorData.error || 'Error al crear proveedor');
         }
 
-        // 6. Mostrar credenciales generadas
+        // 6. Enviar email de bienvenida
+        try {
+          await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: formData.email,
+              subject: 'Bienvenido a KeyHomeKey - Acceso de Proveedor',
+              template: 'providerWelcome',
+              variables: {
+                providerName: formData.name,
+                email: formData.email,
+                password: finalPassword,
+                specialty: formData.specialty,
+                loginUrl: `${window.location.origin}/provider`,
+              }
+            })
+          });
+        } catch (emailError) {
+          console.error('⚠️ Error enviando email:', emailError);
+          // No bloquear el flujo
+        }
+
+        // 7. Mostrar credenciales generadas
         alert(
           `✅ Proveedor creado correctamente!\n\n` +
+          `Nombre: ${formData.name}\n` +
           `Email: ${formData.email}\n` +
           `Contraseña: ${finalPassword}\n\n` +
           `⚠️ Guarda esta contraseña, no se volverá a mostrar.`
@@ -285,18 +299,23 @@ export default function ProvidersPage() {
           return;
         }
 
-        const { error } = await supabase
-          .from('providers')
-          .insert([{
+        const providerResponse = await fetch('/api/admin/providers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             user_id: formData.user_id,
             phone: formData.phone,
             specialty: formData.specialty,
             department: formData.department,
             municipality: formData.municipality,
-            is_active: formData.is_active,
-          }]);
+          }),
+        });
 
-        if (error) throw error;
+        if (!providerResponse.ok) {
+          const errorData = await providerResponse.json();
+          throw new Error(errorData.error || 'Error al crear proveedor');
+        }
+
         alert('Proveedor agregado correctamente');
       }
 
