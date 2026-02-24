@@ -53,9 +53,13 @@ export default function ProvidersPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [creationMode, setCreationMode] = useState<'select' | 'create'>('select');
 
   const [formData, setFormData] = useState({
     user_id: '',
+    name: '',
+    email: '',
+    password: '',
     phone: '',
     specialty: 'Plomería',
     department: '',
@@ -145,35 +149,226 @@ export default function ProvidersPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!formData.user_id || !formData.phone || !formData.department || !formData.municipality) {
-      alert('Por favor completa todos los campos');
-      return;
-    }
-
     try {
+      setLoading(true);
+
       if (editingId) {
+        // ========================================
+        // EDITAR PROVEEDOR EXISTENTE
+        // ========================================
         const { error } = await supabase
           .from('providers')
-          .update(formData)
+          .update({
+            phone: formData.phone,
+            specialty: formData.specialty,
+            department: formData.department,
+            municipality: formData.municipality,
+            is_active: formData.is_active,
+          })
           .eq('id', editingId);
 
         if (error) throw error;
         alert('Proveedor actualizado correctamente');
-      } else {
-        const { error } = await supabase
-          .from('providers')
-          .insert([formData]);
 
-        if (error) throw error;
+      } else if (creationMode === 'create') {
+        // ========================================
+        // CREAR NUEVO USUARIO + PROVEEDOR
+        // ========================================
+
+        if (!formData.name || !formData.email || !formData.phone || !formData.specialty || !formData.department || !formData.municipality) {
+          alert('Por favor completa todos los campos requeridos');
+          setLoading(false);
+          return;
+        }
+
+        // 1. Verificar que el usuario actual es admin
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+          alert('Debes iniciar sesión');
+          setLoading(false);
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from('users_profiles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profile?.role !== 'ADMIN') {
+          alert('Solo administradores pueden crear proveedores');
+          setLoading(false);
+          return;
+        }
+
+        // 2. Generar contraseña si no se proporcionó
+        const finalPassword = formData.password || generatePassword();
+
+        // 3. Crear usuario en auth usando service role
+        const signupResponse = await fetch('/api/auth/signup-provider', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            password: finalPassword,
+            name: formData.name,
+          }),
+        });
+
+        if (!signupResponse.ok) {
+          const errorData = await signupResponse.json();
+          throw new Error(errorData.error || 'Error al crear usuario');
+        }
+
+        const { userId } = await signupResponse.json();
+
+        // 4. Crear perfil en users_profiles
+        const { error: profileError } = await supabase
+          .from('users_profiles')
+          .insert({
+            user_id: userId,
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            role: 'PROVIDER',
+          });
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+          throw new Error('Error al crear perfil: ' + profileError.message);
+        }
+
+        // 5. Crear proveedor usando service role (via endpoint)
+        const providerResponse = await fetch('/api/admin/providers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            phone: formData.phone,
+            specialty: formData.specialty,
+            department: formData.department,
+            municipality: formData.municipality,
+          }),
+        });
+
+        if (!providerResponse.ok) {
+          const errorData = await providerResponse.json();
+          throw new Error(errorData.error || 'Error al crear proveedor');
+        }
+
+        // 6. Enviar email de bienvenida
+        try {
+          await fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: formData.email,
+              subject: 'Bienvenido a KeyHomeKey - Acceso de Proveedor',
+              template: 'providerWelcome',
+              variables: {
+                providerName: formData.name,
+                email: formData.email,
+                password: finalPassword,
+                specialty: formData.specialty,
+                loginUrl: `${window.location.origin}/provider`,
+              }
+            })
+          });
+        } catch (emailError) {
+          console.error('⚠️ Error enviando email:', emailError);
+          // No bloquear el flujo
+        }
+
+        // 7. Mostrar credenciales generadas
+        alert(
+          `✅ Proveedor creado correctamente!\n\n` +
+          `Nombre: ${formData.name}\n` +
+          `Email: ${formData.email}\n` +
+          `Contraseña: ${finalPassword}\n\n` +
+          `⚠️ Guarda esta contraseña, no se volverá a mostrar.`
+        );
+
+      } else {
+        // ========================================
+        // CREAR PROVEEDOR CON USUARIO EXISTENTE
+        // ========================================
+        if (!formData.user_id || !formData.phone || !formData.department || !formData.municipality) {
+          alert('Por favor completa todos los campos');
+          setLoading(false);
+          return;
+        }
+
+        const providerResponse = await fetch('/api/admin/providers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: formData.user_id,
+            phone: formData.phone,
+            specialty: formData.specialty,
+            department: formData.department,
+            municipality: formData.municipality,
+          }),
+        });
+
+        if (!providerResponse.ok) {
+          const errorData = await providerResponse.json();
+          throw new Error(errorData.error || 'Error al crear proveedor');
+        }
+
         alert('Proveedor agregado correctamente');
       }
 
       resetForm();
       await loadProviders();
     } catch (error: any) {
-      console.error('Error saving provider:', error);
+      console.error('❌ Error saving provider:', error);
       alert(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
+  }
+
+  function generatePassword(): string {
+    const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghjkmnpqrstuvwxyz';
+    const numbers = '23456789';
+    const special = '!@#$%';
+
+    const randomIndex = (str: string) => {
+      const bytes = new Uint8Array(1);
+      let idx: number;
+      do {
+        crypto.getRandomValues(bytes);
+        idx = bytes[0];
+      } while (idx >= Math.floor(256 / str.length) * str.length);
+      return idx % str.length;
+    };
+
+    let password = '';
+    password += upper[randomIndex(upper)];
+    password += lower[randomIndex(lower)];
+    password += numbers[randomIndex(numbers)];
+    password += special[randomIndex(special)];
+
+    for (let i = password.length; i < 12; i++) {
+      password += charset[randomIndex(charset)];
+    }
+
+    // Shuffle using Fisher-Yates with crypto random values
+    const arr = password.split('');
+    for (let i = arr.length - 1; i > 0; i--) {
+      const bytes = new Uint8Array(1);
+      let j: number;
+      do {
+        crypto.getRandomValues(bytes);
+        j = bytes[0];
+      } while (j >= Math.floor(256 / (i + 1)) * (i + 1));
+      j = j % (i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr.join('');
   }
 
   async function handleDelete(id: string) {
@@ -199,6 +394,9 @@ export default function ProvidersPage() {
   function handleEdit(provider: Provider) {
     setFormData({
       user_id: provider.user_id,
+      name: '',
+      email: '',
+      password: '',
       phone: provider.phone,
       specialty: provider.specialty,
       department: provider.department,
@@ -212,6 +410,9 @@ export default function ProvidersPage() {
   function resetForm() {
     setFormData({
       user_id: '',
+      name: '',
+      email: '',
+      password: '',
       phone: '',
       specialty: 'Plomería',
       department: '',
@@ -220,6 +421,7 @@ export default function ProvidersPage() {
     });
     setEditingId(null);
     setShowAddForm(false);
+    setCreationMode('select');
   }
 
   if (loading) {
@@ -258,24 +460,97 @@ export default function ProvidersPage() {
               {editingId ? 'Editar Proveedor' : 'Nuevo Proveedor'}
             </h2>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Usuario (Proveedor)
-                </label>
-                <select
-                  value={formData.user_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, user_id: e.target.value }))}
-                  required
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Selecciona un usuario</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name} ({user.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {!editingId && (
+                <div className="md:col-span-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800 mb-2">¿El usuario ya existe o necesitas crear uno nuevo?</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCreationMode('select')}
+                      className={`px-4 py-2 rounded-lg text-sm ${
+                        creationMode === 'select'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-blue-600 border border-blue-300'
+                      }`}
+                    >
+                      Seleccionar usuario existente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreationMode('create')}
+                      className={`px-4 py-2 rounded-lg text-sm ${
+                        creationMode === 'create'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-blue-600 border border-blue-300'
+                      }`}
+                    >
+                      Crear nuevo usuario
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {creationMode === 'create' && !editingId ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre completo *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      required
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Contraseña
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.password}
+                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="Se generará automáticamente si está vacío"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Dejar vacío para generar contraseña automática</p>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Usuario (Proveedor)
+                  </label>
+                  <select
+                    value={formData.user_id}
+                    onChange={(e) => setFormData(prev => ({ ...prev, user_id: e.target.value }))}
+                    required={!editingId}
+                    disabled={!!editingId}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="">Selecciona un usuario</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

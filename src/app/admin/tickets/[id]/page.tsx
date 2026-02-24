@@ -34,7 +34,7 @@ interface TicketDetail {
     address: string;
     department: string;
     municipality: string;
-    property_type: string;
+    type: string;
   };
 }
 
@@ -58,22 +58,73 @@ export default function AdminTicketDetailPage() {
 
   async function loadTicket() {
     try {
-      const { data, error } = await supabase
+      console.log('Loading ticket with ID:', ticketId);
+
+      // Intentar primero con JOIN
+      let { data, error } = await supabase
         .from('tickets')
         .select(`
           *,
-          properties:property_id (
+          properties!property_id (
             id,
             address,
             department,
             municipality,
-            property_type
+            type
           )
         `)
         .eq('id', ticketId)
         .single();
 
-      if (error) throw error;
+      // Si falla el JOIN, intentar con queries separadas
+      if (error && error.code === 'PGRST200') {
+        console.log('JOIN failed, trying separate queries...');
+
+        const { data: ticketData, error: ticketError } = await supabase
+          .from('tickets')
+          .select('*')
+          .eq('id', ticketId)
+          .single();
+
+        if (ticketError) throw ticketError;
+
+        let propertyData = null;
+        if (ticketData.property_id) {
+          const { data: propData, error: propError } = await supabase
+            .from('properties')
+            .select('id, address, department, municipality, type')
+            .eq('id', ticketData.property_id)
+            .single();
+
+          if (propError) {
+            console.error('Error loading property:', propError);
+          } else {
+            propertyData = propData;
+          }
+        }
+
+        data = {
+          ...ticketData,
+          properties: propertyData
+        };
+        error = null;
+      }
+
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
+
+      console.log('Ticket data received:', {
+        id: data?.id,
+        hasProperties: !!data?.properties,
+        propertyData: data?.properties
+      });
 
       const ticketData = {
         ...data,
@@ -82,15 +133,20 @@ export default function AdminTicketDetailPage() {
           address: 'N/A',
           department: 'N/A',
           municipality: 'N/A',
-          property_type: 'N/A'
+          type: 'N/A'
         }
       };
 
+      console.log('Ticket loaded successfully:', ticketData.id);
       setTicket(ticketData);
       setEditStatus(ticketData.status);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading ticket:', error);
-      alert('Error al cargar el ticket');
+
+      const errorMessage = error?.message || 'Error desconocido';
+      const errorDetails = error?.details || '';
+
+      alert(`Error al cargar el ticket:\n${errorMessage}\n${errorDetails}`);
       router.push('/admin/tickets');
     } finally {
       setLoading(false);
@@ -124,10 +180,19 @@ export default function AdminTicketDetailPage() {
     switch (status) {
       case 'Pendiente':
         return 'bg-yellow-100 text-yellow-800';
-      case 'En proceso':
+      case 'Asignado':
+        return 'bg-purple-100 text-purple-800';
+      case 'En progreso':
         return 'bg-blue-100 text-blue-800';
       case 'Completado':
         return 'bg-green-100 text-green-800';
+      case 'Resuelto':
+        return 'bg-emerald-100 text-emerald-800';
+      case 'Rechazado':
+        return 'bg-red-100 text-red-800';
+      // Soporte para estado antiguo
+      case 'En proceso':
+        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -224,8 +289,11 @@ export default function AdminTicketDetailPage() {
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
               >
                 <option value="Pendiente">Pendiente</option>
-                <option value="En proceso">En proceso</option>
+                <option value="Asignado">Asignado</option>
+                <option value="En progreso">En progreso</option>
                 <option value="Completado">Completado</option>
+                <option value="Resuelto">Resuelto</option>
+                <option value="Rechazado">Rechazado</option>
               </select>
             </div>
             <div className="flex gap-2">
@@ -360,7 +428,7 @@ export default function AdminTicketDetailPage() {
               </div>
               <div className="border-t border-gray-200 pt-3">
                 <div className="text-sm text-gray-500">Tipo de propiedad</div>
-                <div className="text-sm font-medium text-gray-900">{ticket.property.property_type}</div>
+                <div className="text-sm font-medium text-gray-900">{ticket.property.type}</div>
               </div>
             </div>
           </div>

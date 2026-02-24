@@ -71,7 +71,7 @@ export default function AdminTicketsPage() {
         .from('tickets')
         .select(`
           *,
-          properties:property_id (
+          properties!property_id (
             address,
             department,
             municipality
@@ -79,7 +79,17 @@ export default function AdminTicketsPage() {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
+
+      console.log('Tickets loaded successfully:', data?.length || 0);
 
       // Transform data to match our interface
       const transformedTickets = data?.map(ticket => ({
@@ -135,10 +145,19 @@ export default function AdminTicketsPage() {
     switch (status) {
       case 'Pendiente':
         return 'bg-yellow-100 text-yellow-800';
-      case 'En proceso':
+      case 'Asignado':
+        return 'bg-purple-100 text-purple-800';
+      case 'En progreso':
         return 'bg-blue-100 text-blue-800';
       case 'Completado':
         return 'bg-green-100 text-green-800';
+      case 'Resuelto':
+        return 'bg-emerald-100 text-emerald-800';
+      case 'Rechazado':
+        return 'bg-red-100 text-red-800';
+      // Soporte para estado antiguo
+      case 'En proceso':
+        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -224,8 +243,11 @@ export default function AdminTicketsPage() {
             >
               <option value="all">Todos</option>
               <option value="Pendiente">Pendiente</option>
-              <option value="En proceso">En proceso</option>
+              <option value="Asignado">Asignado</option>
+              <option value="En progreso">En progreso</option>
               <option value="Completado">Completado</option>
+              <option value="Resuelto">Resuelto</option>
+              <option value="Rechazado">Rechazado</option>
             </select>
           </div>
 
