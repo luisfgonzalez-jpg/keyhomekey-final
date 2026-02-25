@@ -28,6 +28,8 @@ export default function ProviderDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [providerName, setProviderName] = useState('');
+  const [providerEmail, setProviderEmail] = useState('');
+  const [providerPhone, setProviderPhone] = useState('');
   const [specialty, setSpecialty] = useState('');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [stats, setStats] = useState<ProviderStats>({
@@ -35,6 +37,10 @@ export default function ProviderDashboard() {
     completed: 0,
     total: 0,
   });
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadProviderData();
@@ -56,7 +62,7 @@ export default function ProviderDashboard() {
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('full_name, role')
+        .select('full_name, email, phone, role')
         .eq('user_id', user.id)
         .single();
 
@@ -76,6 +82,10 @@ export default function ProviderDashboard() {
 
       console.log('✅ Provider profile loaded:', profile.full_name);
       setProviderName(profile.full_name);
+      setProviderEmail(profile.email || '');
+      setProviderPhone(profile.phone || '');
+      setEditName(profile.full_name || '');
+      setEditPhone(profile.phone || '');
 
       const { data: provider, error: providerError } = await supabase
         .from('providers')
@@ -220,6 +230,32 @@ export default function ProviderDashboard() {
     router.push('/sign-in');
   }
 
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: editName.trim(), phone: editPhone.trim() })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setProviderName(editName.trim());
+      setProviderPhone(editPhone.trim());
+      setShowEditProfileModal(false);
+      alert('✅ Perfil actualizado correctamente');
+    } catch (err: unknown) {
+      console.error('Error saving profile:', err);
+      alert('Error al guardar el perfil');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function getStatusBadge(status: string) {
     const badges: Record<string, string> = {
       'Asignado': 'bg-blue-100 text-blue-800 border-blue-200',
@@ -326,6 +362,39 @@ export default function ProviderDashboard() {
           </div>
         </div>
 
+        {/* Profile Card */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-900">👤 Mi Perfil</h3>
+            <button
+              onClick={() => setShowEditProfileModal(true)}
+              className="text-sm px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition font-medium"
+            >
+              Editar Perfil
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Nombre</p>
+              <p className="text-sm font-medium text-slate-900">{providerName || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Email</p>
+              <p className="text-sm text-slate-900">{providerEmail || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Teléfono</p>
+              <p className="text-sm text-slate-900">{providerPhone || 'No registrado'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Especialidad</p>
+              <span className="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800">
+                {specialty || '—'}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Tickets List */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="p-6 border-b border-slate-200">
@@ -425,6 +494,65 @@ export default function ProviderDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Modal: Editar Perfil */}
+      {showEditProfileModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowEditProfileModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Editar Perfil</h3>
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Nombre completo
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                  placeholder="Tu nombre completo"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Teléfono (WhatsApp)
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                  placeholder="3001234567"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditProfileModal(false)}
+                  className="flex-1 rounded-xl border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 rounded-xl bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800 transition disabled:opacity-50"
+                >
+                  {saving ? 'Guardando…' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
