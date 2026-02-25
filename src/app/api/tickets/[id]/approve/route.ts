@@ -130,11 +130,11 @@ export async function POST(
     // Get user profile for name
     const { data: profile } = await supabase
       .from('profiles')
-      .select('name')
+      .select('full_name')
       .eq('user_id', user.id)
       .single();
 
-    const userName = profile?.name || (isOwner ? 'Propietario' : 'Inquilino');
+    const userName = profile?.full_name || (isOwner ? 'Propietario' : 'Inquilino');
     const userRole = isOwner ? 'OWNER' : 'TENANT';
 
     // Add timeline event

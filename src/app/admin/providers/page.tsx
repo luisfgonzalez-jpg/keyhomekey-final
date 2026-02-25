@@ -24,7 +24,7 @@ interface Provider {
 interface UserProfile {
   id: string;
   email: string;
-  name: string;
+  full_name: string;
   role: string;
 }
 
@@ -108,18 +108,18 @@ export default function ProvidersPage() {
       return;
     }
 
-    // Enrich with user data from users_profiles
+    // Enrich with user data from profiles
     const enrichedProviders = await Promise.all(
       (data || []).map(async (provider) => {
         const { data: userProfile } = await supabase
-          .from('users_profiles')
-          .select('name, email')
+          .from('profiles')
+          .select('full_name, email')
           .eq('user_id', provider.user_id)
           .maybeSingle();
 
         return {
           ...provider,
-          user_name: userProfile?.name || 'Sin nombre',
+          user_name: userProfile?.full_name || 'Sin nombre',
           user_email: userProfile?.email || 'Sin email',
         };
       })
@@ -130,16 +130,17 @@ export default function ProvidersPage() {
 
   async function loadUsers() {
     const { data } = await supabase
-      .from('users_profiles')
-      .select('user_id, email, name, role')
+      .from('profiles')
+      .select('user_id, email, full_name, role')
       .eq('role', 'PROVIDER')
-      .order('name');
+      .not('user_id', 'is', null)
+      .order('full_name');
 
     // Map user_id to id for consistency with interface
     const mappedUsers = (data || []).map(user => ({
       id: user.user_id,
       email: user.email,
-      name: user.name,
+      full_name: user.full_name,
       role: user.role
     }));
 
@@ -191,7 +192,7 @@ export default function ProvidersPage() {
         }
 
         const { data: profile } = await supabase
-          .from('users_profiles')
+          .from('profiles')
           .select('role')
           .eq('user_id', user.id)
           .single();
@@ -223,12 +224,12 @@ export default function ProvidersPage() {
 
         const { userId } = await signupResponse.json();
 
-        // 4. Crear perfil en users_profiles
+        // 4. Crear perfil en profiles
         const { error: profileError } = await supabase
-          .from('users_profiles')
+          .from('profiles')
           .insert({
             user_id: userId,
-            name: formData.name,
+            full_name: formData.name,
             email: formData.email,
             phone: formData.phone,
             role: 'PROVIDER',
@@ -545,7 +546,7 @@ export default function ProvidersPage() {
                     <option value="">Selecciona un usuario</option>
                     {users.map((user) => (
                       <option key={user.id} value={user.id}>
-                        {user.name} ({user.email})
+                        {user.full_name} ({user.email})
                       </option>
                     ))}
                   </select>

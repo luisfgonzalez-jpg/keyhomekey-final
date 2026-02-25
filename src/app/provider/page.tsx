@@ -55,8 +55,8 @@ export default function ProviderDashboard() {
       console.log('✅ User authenticated:', user.id);
 
       const { data: profile, error: profileError } = await supabase
-        .from('users_profiles')
-        .select('name, role')
+        .from('profiles')
+        .select('full_name, role')
         .eq('user_id', user.id)
         .single();
 
@@ -74,8 +74,8 @@ export default function ProviderDashboard() {
         return;
       }
 
-      console.log('✅ Provider profile loaded:', profile.name);
-      setProviderName(profile.name);
+      console.log('✅ Provider profile loaded:', profile.full_name);
+      setProviderName(profile.full_name);
 
       const { data: provider, error: providerError } = await supabase
         .from('providers')

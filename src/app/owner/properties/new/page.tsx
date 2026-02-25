@@ -313,8 +313,8 @@ export default function NewPropertyPage() {
 
           // Get owner profile for name
           const { data: userProfile, error: profileError } = await supabase
-            .from('users_profiles')
-            .select('name')
+            .from('profiles')
+            .select('full_name')
             .eq('user_id', user.id)
             .single();
 
@@ -335,7 +335,7 @@ export default function NewPropertyPage() {
                 propertyType: propertyType,
                 city: city,
                 department: department,
-                ownerName: userProfile?.name || 'Tu propietario',
+                ownerName: userProfile?.full_name || 'Tu propietario',
                 ownerPhone: ownerPhone,
                 contractStart: contractStart || 'No especificado',
                 contractEnd: contractEnd || 'No especificado',

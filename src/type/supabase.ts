@@ -3,25 +3,25 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 export interface Database {
   public: {
     Tables: {
-      users_profiles: {
+      profiles: {
         Row: {
           id: string
-          user_id: string
-          name: string
+          user_id: string | null
+          full_name: string | null
           email: string
           phone: string
-          role: 'OWNER' | 'TENANT' | 'PROVIDER'
+          role: 'OWNER' | 'TENANT' | 'PROVIDER' | 'ADMIN'
           created_at: string
         }
         Insert: {
-          user_id: string
-          name: string
+          user_id?: string | null
+          full_name?: string | null
           email: string
           phone: string
-          role: 'OWNER' | 'TENANT' | 'PROVIDER'
+          role: 'OWNER' | 'TENANT' | 'PROVIDER' | 'ADMIN'
           created_at?: string
         }
-        Update: Partial<Database['public']['Tables']['users_profiles']['Insert']>
+        Update: Partial<Database['public']['Tables']['profiles']['Insert']>
       }
       // Agrega otras tablas si lo necesitas
     }

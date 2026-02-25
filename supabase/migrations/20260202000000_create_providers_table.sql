@@ -32,7 +32,7 @@ FOR INSERT
 WITH CHECK (
     EXISTS (
         SELECT 1 FROM public.profiles
-        WHERE id = auth.uid()
+        WHERE user_id = auth.uid()
         AND role = 'ADMIN'
     )
 );
@@ -44,7 +44,7 @@ FOR UPDATE
 USING (
     EXISTS (
         SELECT 1 FROM public.profiles
-        WHERE id = auth.uid()
+        WHERE user_id = auth.uid()
         AND role = 'ADMIN'
     )
 );
@@ -56,7 +56,7 @@ FOR DELETE
 USING (
     EXISTS (
         SELECT 1 FROM public.profiles
-        WHERE id = auth.uid()
+        WHERE user_id = auth.uid()
         AND role = 'ADMIN'
     )
 );
