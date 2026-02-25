@@ -137,31 +137,30 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
   };
 
   const uploadFiles = async (files: File[]): Promise<string[]> => {
-    const uploadedUrls: string[] = [];
+    const results = await Promise.all(
+      files.map(async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${crypto.randomUUID()}.${fileExt}`;
+        const filePath = `${ticketId}/${fileName}`;
 
-    for (const file of files) {
-      const fileExt = file.name.split('.').pop();
-      // Use crypto.randomUUID() for secure unique file names
-      const fileName = `${crypto.randomUUID()}.${fileExt}`;
-      const filePath = `${ticketId}/${fileName}`;
+        const { error } = await supabase.storage
+          .from('tickets-media')
+          .upload(filePath, file);
 
-      const { error } = await supabase.storage
-        .from('tickets-media')
-        .upload(filePath, file);
+        if (error) {
+          console.error('Error uploading file:', error);
+          return null;
+        }
 
-      if (error) {
-        console.error('Error uploading file:', error);
-        continue;
-      }
+        const urlData = supabase.storage
+          .from('tickets-media')
+          .getPublicUrl(filePath);
 
-      const urlData = supabase.storage
-        .from('tickets-media')
-        .getPublicUrl(filePath);
+        return urlData.data.publicUrl;
+      })
+    );
 
-      uploadedUrls.push(urlData.data.publicUrl);
-    }
-
-    return uploadedUrls;
+    return results.filter((url): url is string => url !== null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

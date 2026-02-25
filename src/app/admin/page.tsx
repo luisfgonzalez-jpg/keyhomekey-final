@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Ticket, Clock, CheckCircle2, Users, AlertTriangle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -38,7 +38,7 @@ const PRIORITY_COLORS = {
 };
 
 export default function AdminDashboard() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [stats, setStats] = useState<Stats>({
     totalTickets: 0,
     pendingTickets: 0,
@@ -58,12 +58,7 @@ export default function AdminDashboard() {
 
   async function loadStats() {
     try {
-      // Get total tickets count
-      const { count: totalTickets } = await supabase
-        .from('tickets')
-        .select('*', { count: 'exact', head: true });
-
-      // Get all tickets for detailed stats
+      // Get all tickets for stats (count is derived from data.length)
       const { data: tickets } = await supabase
         .from('tickets')
         .select('status, category, priority');
@@ -114,7 +109,7 @@ export default function AdminDashboard() {
         .eq('is_active', true);
 
       setStats({
-        totalTickets: totalTickets || 0,
+        totalTickets: tickets?.length || 0,
         pendingTickets,
         inProgressTickets,
         completedTickets,

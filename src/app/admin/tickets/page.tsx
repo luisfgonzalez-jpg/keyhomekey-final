@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { Search, Filter, Eye, Calendar, MapPin, User, Wrench, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -44,9 +44,8 @@ const CATEGORIES = [
 ];
 
 export default function AdminTicketsPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Filters
@@ -60,9 +59,32 @@ export default function AdminTicketsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    applyFilters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const filteredTickets = useMemo(() => {
+    let filtered = [...tickets];
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(t => t.status === statusFilter);
+    }
+
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(t => t.category === categoryFilter);
+    }
+
+    if (priorityFilter !== 'all') {
+      filtered = filtered.filter(t => t.priority === priorityFilter);
+    }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        t =>
+          t.id.toLowerCase().includes(query) ||
+          t.property?.address?.toLowerCase().includes(query) ||
+          t.reporter?.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
   }, [tickets, statusFilter, categoryFilter, priorityFilter, searchQuery]);
 
   async function loadTickets() {
@@ -107,38 +129,6 @@ export default function AdminTicketsPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function applyFilters() {
-    let filtered = [...tickets];
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(t => t.status === statusFilter);
-    }
-
-    // Category filter
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter(t => t.category === categoryFilter);
-    }
-
-    // Priority filter
-    if (priorityFilter !== 'all') {
-      filtered = filtered.filter(t => t.priority === priorityFilter);
-    }
-
-    // Search query (ID or address)
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        t =>
-          t.id.toLowerCase().includes(query) ||
-          t.property?.address?.toLowerCase().includes(query) ||
-          t.reporter?.toLowerCase().includes(query)
-      );
-    }
-
-    setFilteredTickets(filtered);
   }
 
   function getStatusBadgeColor(status: string) {
