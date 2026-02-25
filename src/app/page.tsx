@@ -1186,6 +1186,13 @@ export default function HomePage() {
         }
       }
 
+      // Redirect PROVIDER users to dedicated provider panel
+      if (role === 'PROVIDER') {
+        setUserRole(role);
+        router.push('/provider');
+        return;
+      }
+
       // Redirect ADMIN users to dedicated admin panel
       if (role === 'ADMIN') {
         setUserRole(role);
