@@ -27,6 +27,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminName, setAdminName] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       const { data: userProfile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, full_name, email')
         .eq('user_id', user.id)
         .single();
 
@@ -54,6 +56,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         router.push('/');
         return;
       }
+
+      setAdminName(userProfile?.full_name || '');
+      setAdminEmail(userProfile?.email || user.email || '');
 
       setIsAdmin(true);
     } catch (error) {
@@ -132,6 +137,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Bottom actions */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 space-y-2">
+          {(adminName || adminEmail) && (
+            <div className="px-4 py-2 mb-1">
+              <p className="text-xs text-gray-500">Administrador</p>
+              {adminName && (
+                <p className="text-sm font-medium text-gray-900 truncate">{adminName}</p>
+              )}
+              {adminEmail && (
+                <p className="text-xs text-gray-400 truncate">{adminEmail}</p>
+              )}
+            </div>
+          )}
           <Link
             href="/"
             className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors w-full"
