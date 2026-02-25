@@ -55,7 +55,34 @@ export async function proxy(request: NextRequest) {
   )
 
   // Refresh session if expired
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    const currentPath = request.nextUrl.pathname
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single()
+
+    const userRole = profile?.role
+
+    if (userRole === 'PROVIDER' && currentPath === '/') {
+      return NextResponse.redirect(new URL('/provider', request.url))
+    }
+
+    if (userRole === 'ADMIN' && currentPath === '/') {
+      return NextResponse.redirect(new URL('/admin', request.url))
+    }
+
+    if (currentPath.startsWith('/admin') && userRole !== 'ADMIN') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+
+    if (currentPath.startsWith('/provider') && userRole !== 'PROVIDER') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+  }
 
   return response
 }
