@@ -61,8 +61,8 @@ export default function ProviderDashboard() {
       console.log('✅ User authenticated:', user.id);
 
       const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('full_name, email, phone, role')
+        .from('users_profiles')
+        .select('name, email, phone, role')
         .eq('user_id', user.id)
         .single();
 
@@ -80,19 +80,19 @@ export default function ProviderDashboard() {
         return;
       }
 
-      console.log('✅ Provider profile loaded:', profile.full_name);
+      console.log('✅ Provider profile loaded:', profile.name);
       console.log('✅ Provider email:', profile.email);
       console.log('✅ Provider phone:', profile.phone);
 
-      if (!profile.full_name) {
+      if (!profile.name) {
         console.warn('⚠️ ALERTA: El proveedor no tiene nombre registrado en la BD');
         console.log('Datos del perfil:', JSON.stringify(profile, null, 2));
       }
 
-      setProviderName(profile.full_name || 'Sin nombre');
+      setProviderName(profile.name || 'Sin nombre');
       setProviderEmail(profile.email || 'Sin email');
       setProviderPhone(profile.phone || 'Sin teléfono');
-      setEditName(profile.full_name || '');
+      setEditName(profile.name || '');
       setEditPhone(profile.phone || '');
 
       const { data: provider, error: providerError } = await supabase
