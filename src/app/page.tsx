@@ -1189,17 +1189,20 @@ export default function HomePage() {
       // Redirect ADMIN users to dedicated admin panel
       if (role === 'ADMIN') {
         setUserRole(role);
-        
-        // Direct redirect (session is now clean and fresh)
-        router.push('/admin');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/admin') {
+          console.log('🔄 Redirigiendo admin a /admin');
+          router.push('/admin');
+        }
         return;
       }
 
       // Redirect PROVIDER users to dedicated provider panel
       if (role === 'PROVIDER') {
-        console.log('🔄 Redirigiendo proveedor a /provider');
         setUserRole(role);
-        router.push('/provider');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/provider') {
+          console.log('🔄 Redirigiendo proveedor a /provider');
+          router.push('/provider');
+        }
         return;
       }
 
