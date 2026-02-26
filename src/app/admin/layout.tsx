@@ -46,8 +46,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
 
       const { data: userProfile } = await supabase
-        .from('profiles')
-        .select('role, full_name, email')
+        .from('users_profiles')
+        .select('role, name, email')
         .eq('user_id', user.id)
         .single();
 
@@ -57,7 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
-      setAdminName(userProfile?.full_name || '');
+      setAdminName(userProfile?.name || '');
       setAdminEmail(userProfile?.email || user.email || '');
 
       setIsAdmin(true);

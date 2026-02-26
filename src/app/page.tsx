@@ -1189,7 +1189,7 @@ export default function HomePage() {
       // Redirect ADMIN users to dedicated admin panel
       if (role === 'ADMIN') {
         setUserRole(role);
-        if (typeof window !== 'undefined' && window.location.pathname !== '/admin') {
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admin')) {
           console.log('🔄 Redirigiendo admin a /admin');
           router.push('/admin');
         }
@@ -1199,7 +1199,7 @@ export default function HomePage() {
       // Redirect PROVIDER users to dedicated provider panel
       if (role === 'PROVIDER') {
         setUserRole(role);
-        if (typeof window !== 'undefined' && window.location.pathname !== '/provider') {
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/provider')) {
           console.log('🔄 Redirigiendo proveedor a /provider');
           router.push('/provider');
         }
