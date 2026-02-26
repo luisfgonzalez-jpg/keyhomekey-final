@@ -1195,6 +1195,14 @@ export default function HomePage() {
         return;
       }
 
+      // Redirect PROVIDER users to dedicated provider panel
+      if (role === 'PROVIDER') {
+        console.log('🔄 Redirigiendo proveedor a /provider');
+        setUserRole(role);
+        router.push('/provider');
+        return;
+      }
+
       setUserRole(role);
       setView('dashboard');
       await fetchData(role, user);
