@@ -81,9 +81,17 @@ export default function ProviderDashboard() {
       }
 
       console.log('✅ Provider profile loaded:', profile.full_name);
-      setProviderName(profile.full_name);
-      setProviderEmail(profile.email || '');
-      setProviderPhone(profile.phone || '');
+      console.log('✅ Provider email:', profile.email);
+      console.log('✅ Provider phone:', profile.phone);
+
+      if (!profile.full_name) {
+        console.warn('⚠️ ALERTA: El proveedor no tiene nombre registrado en la BD');
+        console.log('Datos del perfil:', JSON.stringify(profile, null, 2));
+      }
+
+      setProviderName(profile.full_name || 'Sin nombre');
+      setProviderEmail(profile.email || 'Sin email');
+      setProviderPhone(profile.phone || 'Sin teléfono');
       setEditName(profile.full_name || '');
       setEditPhone(profile.phone || '');
 
@@ -107,7 +115,15 @@ export default function ProviderDashboard() {
       }
 
       console.log('✅ Provider info loaded. ID:', provider.id, 'Specialty:', provider.specialty);
-      setSpecialty(provider.specialty);
+
+      if (!provider.specialty) {
+        console.warn('⚠️ ALERTA: El proveedor no tiene especialidad registrada');
+        console.log('Datos del provider:', JSON.stringify(provider, null, 2));
+      }
+
+      setSpecialty(provider.specialty || 'Sin especialidad');
+
+      console.log(`🔍 Filtrando tickets para provider ID: ${provider.id}`);
 
       const { data: ticketsData, error: ticketsError } = await supabase
         .from('tickets')
@@ -126,8 +142,7 @@ export default function ProviderDashboard() {
         console.error('Error fetching tickets:', ticketsError);
       }
 
-      console.log(`✅ Loaded ${ticketsData?.length || 0} tickets assigned to provider ${provider.id}`);
-
+      console.log(`✅ Tickets asignados encontrados: ${ticketsData?.length || 0}`);
       setTickets(ticketsData || []);
 
       const active = ticketsData?.filter(t =>
