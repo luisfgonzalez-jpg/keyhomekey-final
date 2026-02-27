@@ -253,8 +253,8 @@ export default function ProviderDashboard() {
       if (!user) return;
 
       const { error } = await supabase
-        .from('profiles')
-        .update({ full_name: editName.trim(), phone: editPhone.trim() })
+        .from('users_profiles')
+        .update({ name: editName.trim(), phone: editPhone.trim() })
         .eq('user_id', user.id);
 
       if (error) throw error;
