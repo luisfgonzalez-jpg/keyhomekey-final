@@ -88,9 +88,8 @@ interface Ticket {
 type Role = 'OWNER' | 'TENANT' | 'PROVIDER' | 'ADMIN' | null;
 
 interface UserProfile {
-  id?: string;
-  user_id: string;
-  name: string;
+  auth_user_id: string | null;
+  full_name: string | null;
   email: string;
   phone: string;
   role: string;
@@ -1016,9 +1015,9 @@ export default function HomePage() {
       
       try {
         const { data, error } = await supabase
-          .from('users_profiles')
+          .from('profiles')
           .select('*')
-          .eq('user_id', session.user.id)
+          .eq('auth_user_id', session.user.id)
           .maybeSingle();
         
         if (error) {
@@ -1029,7 +1028,7 @@ export default function HomePage() {
         if (data) {
           setProfile(data);
           setProfileForm({
-            name: data.name || '',
+            name: data.full_name || '',
             phone: data.phone || '',
           });
         }
@@ -1083,7 +1082,7 @@ export default function HomePage() {
         const normalizedEmail = email.trim().toLowerCase();
 
         const { data: invitedProfiles } = await supabase
-          .from('users_profiles')
+          .from('profiles')
           .select('*')
           .eq('email', normalizedEmail)
           .limit(1);
@@ -1107,13 +1106,13 @@ export default function HomePage() {
 
         if (isInvitedTenant && invitedProfile) {
           await supabase
-            .from('users_profiles')
-            .update({ user_id: user.id, name: name.trim(), phone: phone.trim() })
-            .eq('id', invitedProfile.id);
+            .from('profiles')
+            .update({ auth_user_id: user.id, full_name: name.trim(), phone: phone.trim() })
+            .eq('email', normalizedEmail);
           alert('Cuenta de inquilino creada con éxito. Ahora puedes iniciar sesión.');
         } else {
-          await supabase.from('users_profiles').insert([
-            { user_id: user.id, name: name.trim(), email: normalizedEmail, phone: phone.trim(), role: 'OWNER' },
+          await supabase.from('profiles').insert([
+            { auth_user_id: user.id, full_name: name.trim(), email: normalizedEmail, phone: phone.trim(), role: 'OWNER' },
           ]);
           alert('Usuario registrado con éxito.');
         }
@@ -1152,9 +1151,9 @@ export default function HomePage() {
 
     try {
       const { data: profile } = await supabase
-        .from('users_profiles')
+        .from('profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('auth_user_id', user.id)
         .single();
 
       let role: Role = null;
@@ -1174,10 +1173,10 @@ export default function HomePage() {
         role = tenantProps && tenantProps.length > 0 ? 'TENANT' : 'OWNER';
 
         if (!profile) {
-          await supabase.from('users_profiles').insert([
+          await supabase.from('profiles').insert([
             {
-              user_id: user.id,
-              name: user.email?.split('@')[0] || 'Usuario',
+              auth_user_id: user.id,
+              full_name: user.email?.split('@')[0] || 'Usuario',
               email: user.email,
               phone: '',
               role,
@@ -1241,12 +1240,12 @@ export default function HomePage() {
           const ownerIds = propsData.map(p => p.owner_id).filter(Boolean) as string[];
           if (ownerIds.length > 0) {
             const { data: ownerProfiles } = await supabase
-              .from('users_profiles')
-              .select('user_id, name')
-              .in('user_id', ownerIds);
+              .from('profiles')
+              .select('auth_user_id, full_name')
+              .in('auth_user_id', ownerIds);
             
             if (ownerProfiles) {
-              const ownerMap = new Map(ownerProfiles.map(o => [o.user_id, o.name]));
+              const ownerMap = new Map(ownerProfiles.map(o => [o.auth_user_id, o.full_name]));
               propsData = propsData.map(p => ({
                 ...p,
                 owner_name: p.owner_id ? ownerMap.get(p.owner_id) : undefined
@@ -1278,17 +1277,17 @@ export default function HomePage() {
                 .maybeSingle();
 
               if (provider?.user_id) {
-                // Obtener nombre del proveedor desde users_profiles
+                // Obtener nombre del proveedor desde profiles
                 const { data: userProfile } = await supabase
-                  .from('users_profiles')
-                  .select('name')
-                  .eq('user_id', provider.user_id)
+                  .from('profiles')
+                  .select('full_name')
+                  .eq('auth_user_id', provider.user_id)
                   .maybeSingle();
 
-                if (userProfile?.name) {
+                if (userProfile?.full_name) {
                   return {
                     ...ticket,
-                    assigned_provider_name: userProfile.name,
+                    assigned_provider_name: userProfile.full_name,
                   };
                 }
               }
@@ -1595,13 +1594,13 @@ export default function HomePage() {
     try {
       const user = session.user;
 
-      const { data: profiles } = await supabase.from('users_profiles').select('user_id').eq('user_id', user.id).limit(1);
+      const { data: profiles } = await supabase.from('profiles').select('auth_user_id').eq('auth_user_id', user.id).limit(1);
 
       if (!profiles || profiles.length === 0) {
-        await supabase.from('users_profiles').insert([
+        await supabase.from('profiles').insert([
           {
-            user_id: user.id,
-            name: user.email?.split('@')[0] || 'Usuario',
+            auth_user_id: user.id,
+            full_name: user.email?.split('@')[0] || 'Usuario',
             email: user.email,
             phone: '',
             role: 'OWNER',
@@ -1636,13 +1635,13 @@ export default function HomePage() {
 
       if (newProp.isRented && newProp.tenantEmail) {
         const tenantEmail = newProp.tenantEmail.trim().toLowerCase();
-        const { data: existingTenant } = await supabase.from('users_profiles').select('id').eq('email', tenantEmail).limit(1);
+        const { data: existingTenant } = await supabase.from('profiles').select('auth_user_id').eq('email', tenantEmail).limit(1);
 
         if (!existingTenant || existingTenant.length === 0) {
-          await supabase.from('users_profiles').insert([
+          await supabase.from('profiles').insert([
             {
-              user_id: null,
-              name: newProp.tenantName?.trim() || tenantEmail.split('@')[0],
+              auth_user_id: null,
+              full_name: newProp.tenantName?.trim() || tenantEmail.split('@')[0],
               email: tenantEmail,
               phone: newProp.tenantPhone?.trim() || '',
               role: 'TENANT',
@@ -1688,18 +1687,18 @@ export default function HomePage() {
       setLoading(true);
       
       const { error } = await supabase
-        .from('users_profiles')
+        .from('profiles')
         .update({
-          name: profileForm.name.trim(),
+          full_name: profileForm.name.trim(),
           phone: profileForm.phone.trim(),
         })
-        .eq('user_id', session.user.id);
+        .eq('auth_user_id', session.user.id);
       
       if (error) throw error;
       
       // Actualizar estado local
       if (profile) {
-        setProfile({ ...profile, name: profileForm.name, phone: profileForm.phone });
+        setProfile({ ...profile, full_name: profileForm.name, phone: profileForm.phone });
       }
       
       setShowEditProfileModal(false);
@@ -1783,21 +1782,21 @@ export default function HomePage() {
       
       if (propError) throw propError;
       
-      // 2. Verificar si el inquilino ya existe en users_profiles
+      // 2. Verificar si el inquilino ya existe en profiles
       const tenantEmail = tenantForm.tenantEmail.trim().toLowerCase();
       const { data: existingProfile, error: profileCheckError } = await supabase
-        .from('users_profiles')
-        .select('id')
+        .from('profiles')
+        .select('auth_user_id')
         .eq('email', tenantEmail)
         .maybeSingle();
       
       // 3. Si no existe, crear perfil de inquilino
       if (!existingProfile && !profileCheckError) {
         const { error: profileError } = await supabase
-          .from('users_profiles')
+          .from('profiles')
           .insert([{
-            user_id: null,
-            name: tenantForm.tenantName.trim(),
+            auth_user_id: null,
+            full_name: tenantForm.tenantName.trim(),
             email: tenantEmail,
             phone: tenantForm.tenantPhone.trim(),
             role: 'TENANT',
@@ -2252,7 +2251,7 @@ export default function HomePage() {
             <div className="space-y-3">
               <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
                 <p className="text-[11px] text-slate-500 mb-1">Nombre</p>
-                <p className="text-sm font-semibold text-slate-900">{profile?.name || session?.user?.email || 'Usuario'}</p>
+                <p className="text-sm font-semibold text-slate-900">{profile?.full_name || session?.user?.email || 'Usuario'}</p>
               </div>
               
               <div className="border border-slate-100 rounded-xl px-3 py-2.5 bg-slate-50">
