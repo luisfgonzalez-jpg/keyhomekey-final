@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/utils/supabase/client';
 
 interface Ticket {
   id: string;
@@ -26,6 +26,7 @@ interface ProviderStats {
 
 export default function ProviderDashboard() {
   const router = useRouter();
+  const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [providerName, setProviderName] = useState('');
   const [providerEmail, setProviderEmail] = useState('');
@@ -60,17 +61,38 @@ export default function ProviderDashboard() {
 
       console.log('✅ User authenticated:', user.id);
 
-      const { data: profile, error: profileError } = await supabase
+      // Try to load profile by auth_user_id first, fallback to email (same as admin)
+      let profile = null;
+      const { data: profileById } = await supabase
         .from('profiles')
         .select('full_name, email, phone, role')
         .eq('auth_user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-        alert('Error al cargar tu perfil');
-        setLoading(false);
-        return;
+      if (profileById) {
+        profile = profileById;
+      } else {
+        // Fallback: find by email and link auth_user_id
+        const { data: profileByEmail } = await supabase
+          .from('profiles')
+          .select('full_name, email, phone, role')
+          .eq('email', user.email!)
+          .maybeSingle();
+
+        if (profileByEmail) {
+          profile = profileByEmail;
+          // Link auth_user_id via API (bypasses RLS)
+          await fetch('/api/auth/link-tenant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: user.email,
+              auth_user_id: user.id,
+              full_name: profileByEmail.full_name,
+              phone: profileByEmail.phone,
+            }),
+          });
+        }
       }
 
       if (!profile || profile.role !== 'PROVIDER') {
