@@ -1191,6 +1191,8 @@ export default function HomePage() {
         setUserRole(role);
         if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admin')) {
           console.log('🔄 Redirigiendo admin a /admin');
+          // Wait for session to propagate before redirecting
+          await new Promise(resolve => setTimeout(resolve, 100));
           router.push('/admin');
         }
         return;
@@ -1201,6 +1203,8 @@ export default function HomePage() {
         setUserRole(role);
         if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/provider')) {
           console.log('🔄 Redirigiendo proveedor a /provider');
+          // Wait for session to propagate before redirecting
+          await new Promise(resolve => setTimeout(resolve, 100));
           router.push('/provider');
         }
         return;
