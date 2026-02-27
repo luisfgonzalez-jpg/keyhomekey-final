@@ -80,7 +80,7 @@ export async function POST(
     const { data: profile } = await supabase
       .from('profiles')
       .select('full_name')
-      .eq('user_id', user.id)
+      .eq('auth_user_id', user.id)
       .single();
 
     const userName = profile?.full_name || 'Proveedor';

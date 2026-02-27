@@ -71,7 +71,7 @@ export async function GET(request: Request) {
             const { data: userProfile } = await supabase
               .from('profiles')
               .select('full_name')
-              .eq('user_id', provider.user_id)
+              .eq('auth_user_id', provider.user_id)
               .maybeSingle();
 
             if (userProfile?.full_name) {

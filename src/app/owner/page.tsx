@@ -40,7 +40,7 @@ export default function OwnerDashboardPage() {
       const { data, error } = await supabase
         .from('profiles')
         .select('full_name, email, phone, role, created_at')
-        .eq('user_id', user.id)
+        .eq('auth_user_id', user.id)
         .single();
 
       if (error) {
@@ -67,7 +67,7 @@ export default function OwnerDashboardPage() {
       const { error } = await supabase
         .from('profiles')
         .update({ full_name: editName.trim(), phone: editPhone.trim() })
-        .eq('user_id', user.id);
+        .eq('auth_user_id', user.id);
 
       if (error) throw error;
 

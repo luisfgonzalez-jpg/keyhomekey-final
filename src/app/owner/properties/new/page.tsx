@@ -315,7 +315,7 @@ export default function NewPropertyPage() {
           const { data: userProfile, error: profileError } = await supabase
             .from('profiles')
             .select('full_name')
-            .eq('user_id', user.id)
+            .eq('auth_user_id', user.id)
             .single();
 
           if (profileError) {

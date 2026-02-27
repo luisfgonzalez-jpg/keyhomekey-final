@@ -114,7 +114,7 @@ export default function ProvidersPage() {
         const { data: userProfile } = await supabase
           .from('profiles')
           .select('full_name, email')
-          .eq('user_id', provider.user_id)
+          .eq('auth_user_id', provider.user_id)
           .maybeSingle();
 
         return {
@@ -131,14 +131,14 @@ export default function ProvidersPage() {
   async function loadUsers() {
     const { data } = await supabase
       .from('profiles')
-      .select('user_id, email, full_name, role')
+      .select('auth_user_id, email, full_name, role')
       .eq('role', 'PROVIDER')
-      .not('user_id', 'is', null)
+      .not('auth_user_id', 'is', null)
       .order('full_name');
 
-    // Map user_id to id for consistency with interface
+    // Map auth_user_id to id for consistency with interface
     const mappedUsers = (data || []).map(user => ({
-      id: user.user_id,
+      id: user.auth_user_id,
       email: user.email,
       full_name: user.full_name,
       role: user.role
@@ -194,7 +194,7 @@ export default function ProvidersPage() {
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
-          .eq('user_id', user.id)
+          .eq('auth_user_id', user.id)
           .single();
 
         if (profile?.role !== 'ADMIN') {
@@ -228,7 +228,7 @@ export default function ProvidersPage() {
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
-            user_id: userId,
+            auth_user_id: userId,
             full_name: formData.name,
             email: formData.email,
             phone: formData.phone,

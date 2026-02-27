@@ -48,7 +48,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       const { data: userProfile } = await supabase
         .from('profiles')
         .select('role, full_name, email')
-        .eq('user_id', user.id)
+        .eq('auth_user_id', user.id)
         .single();
 
       if (userProfile?.role !== 'ADMIN') {
