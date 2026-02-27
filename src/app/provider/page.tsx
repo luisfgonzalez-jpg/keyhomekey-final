@@ -53,16 +53,16 @@ export default function ProviderDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        console.log('No user found, redirecting to sign-in');
-        router.push('/sign-in');
+        console.log('No user found, redirecting to home');
+        router.push('/');
         return;
       }
 
       console.log('✅ User authenticated:', user.id);
 
       const { data: profile, error: profileError } = await supabase
-        .from('users_profiles')
-        .select('name, email, phone, role')
+        .from('profiles')
+        .select('full_name, email, phone, role')
         .eq('user_id', user.id)
         .single();
 
@@ -80,19 +80,19 @@ export default function ProviderDashboard() {
         return;
       }
 
-      console.log('✅ Provider profile loaded:', profile.name);
+      console.log('✅ Provider profile loaded:', profile.full_name);
       console.log('✅ Provider email:', profile.email);
       console.log('✅ Provider phone:', profile.phone);
 
-      if (!profile.name) {
+      if (!profile.full_name) {
         console.warn('⚠️ ALERTA: El proveedor no tiene nombre registrado en la BD');
         console.log('Datos del perfil:', JSON.stringify(profile, null, 2));
       }
 
-      setProviderName(profile.name || 'Sin nombre');
+      setProviderName(profile.full_name || 'Sin nombre');
       setProviderEmail(profile.email || 'Sin email');
       setProviderPhone(profile.phone || 'Sin teléfono');
-      setEditName(profile.name || '');
+      setEditName(profile.full_name || '');
       setEditPhone(profile.phone || '');
 
       const { data: provider, error: providerError } = await supabase
@@ -242,7 +242,7 @@ export default function ProviderDashboard() {
   async function handleLogout() {
     console.log('Logging out...');
     await supabase.auth.signOut();
-    router.push('/sign-in');
+    router.push('/');
   }
 
   async function handleSaveProfile(e: React.FormEvent) {
@@ -253,8 +253,8 @@ export default function ProviderDashboard() {
       if (!user) return;
 
       const { error } = await supabase
-        .from('users_profiles')
-        .update({ name: editName.trim(), phone: editPhone.trim() })
+        .from('profiles')
+        .update({ full_name: editName.trim(), phone: editPhone.trim() })
         .eq('user_id', user.id);
 
       if (error) throw error;
