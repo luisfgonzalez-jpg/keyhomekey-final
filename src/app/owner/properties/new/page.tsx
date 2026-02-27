@@ -339,7 +339,7 @@ export default function NewPropertyPage() {
                 ownerPhone: ownerPhone,
                 contractStart: contractStart || 'No especificado',
                 contractEnd: contractEnd || 'No especificado',
-                loginUrl: `${window.location.origin}/sign-in`,
+                loginUrl: `${window.location.origin}/`,
               }
             })
           });

@@ -470,7 +470,7 @@ export async function POST(request: Request) {
                 ownerPhone: body.ownerPhone || 'Teléfono no disponible',
                 contractStart: body.contractStart || 'No especificado',
                 contractEnd: body.contractEnd || 'No especificado',
-                loginUrl: body.loginUrl || 'https://keyhomekey.com/sign-in',
+                loginUrl: body.loginUrl || 'https://keyhomekey.com/',
             };
             
             console.log('✅ Legacy format converted to new format (tenantWelcome template with Spanish defaults)');

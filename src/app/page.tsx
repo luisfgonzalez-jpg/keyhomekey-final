@@ -1104,17 +1104,23 @@ export default function HomePage() {
         const user = data.user;
         if (!user) throw new Error('No se pudo obtener el usuario.');
 
-        if (isInvitedTenant && invitedProfile) {
-          await supabase
-            .from('profiles')
-            .update({ auth_user_id: user.id, full_name: name.trim(), phone: phone.trim() })
-            .eq('email', normalizedEmail);
-          alert('Cuenta de inquilino creada con éxito. Ahora puedes iniciar sesión.');
+        // Use API to update/insert profile (service role bypasses RLS)
+        await fetch('/api/auth/link-tenant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: normalizedEmail,
+            auth_user_id: user.id,
+            full_name: name.trim(),
+            phone: phone.trim(),
+            fallbackRole: 'OWNER',
+          }),
+        });
+
+        if (isInvitedTenant) {
+          alert('¡Cuenta de inquilino creada! Ahora puedes iniciar sesión.');
         } else {
-          await supabase.from('profiles').insert([
-            { auth_user_id: user.id, full_name: name.trim(), email: normalizedEmail, phone: phone.trim(), role: 'OWNER' },
-          ]);
-          alert('Usuario registrado con éxito.');
+          alert('¡Usuario registrado! Ahora puedes iniciar sesión.');
         }
 
         setAuthMode('signin');
