@@ -1156,11 +1156,56 @@ export default function HomePage() {
     if (!user) return;
 
     try {
-      const { data: profile } = await supabase
+      // 1. Try to find profile by auth_user_id
+      const { data: profileById } = await supabase
         .from('profiles')
         .select('*')
         .eq('auth_user_id', user.id)
-        .single();
+        .maybeSingle();
+
+      // 2. Also check by email (catches tenants invited before they registered,
+      //    or cases where auth_user_id wasn't linked yet)
+      const { data: profileByEmail } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', user.email!)
+        .maybeSingle();
+
+      // 3. Prefer email-based profile if it has a more specific role,
+      //    OR if it's the only one, OR if the auth_user_id one is a duplicate OWNER
+      let profile = profileById;
+      if (!profileById && profileByEmail) {
+        // No profile by ID yet — link auth_user_id via API and use this profile
+        profile = profileByEmail;
+        await fetch('/api/auth/link-tenant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            auth_user_id: user.id,
+            full_name: profileByEmail.full_name,
+            phone: profileByEmail.phone,
+          }),
+        });
+      } else if (profileById && profileByEmail && profileById.auth_user_id !== profileByEmail.auth_user_id) {
+        // Two different profiles — prefer the one with the more specific role
+        const specificRoles = ['TENANT', 'PROVIDER', 'ADMIN'];
+        if (specificRoles.includes(profileByEmail.role) && profileById.role === 'OWNER') {
+          // The email profile has a real role; the ID one is a duplicate OWNER — use email profile
+          profile = profileByEmail;
+          // Update the email profile to have the correct auth_user_id
+          await fetch('/api/auth/link-tenant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: user.email,
+              auth_user_id: user.id,
+              full_name: profileByEmail.full_name,
+              phone: profileByEmail.phone,
+            }),
+          });
+        }
+      }
 
       let role: Role = null;
 
@@ -1169,7 +1214,7 @@ export default function HomePage() {
       }
 
       if (!role) {
-        // Check if user is tenant by ID or email
+        // Last resort: check properties table
         const { data: tenantProps } = await supabase
           .from('properties')
           .select('id')
