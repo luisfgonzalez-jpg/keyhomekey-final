@@ -52,7 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .single();
 
       if (userProfile?.role !== 'ADMIN') {
-        alert('No tienes permisos para acceder al panel de administración');
+        console.log('User is not admin, redirecting. Role:', userProfile?.role);
         router.push('/');
         return;
       }

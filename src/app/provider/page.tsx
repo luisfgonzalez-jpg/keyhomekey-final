@@ -74,8 +74,7 @@ export default function ProviderDashboard() {
       }
 
       if (!profile || profile.role !== 'PROVIDER') {
-        console.log('User is not a provider, redirecting');
-        alert('Acceso denegado. Solo proveedores pueden acceder a esta página.');
+        console.log('User is not a provider, redirecting. Role:', profile?.role);
         router.push('/');
         return;
       }
